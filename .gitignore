@@ -1,0 +1,29 @@
+# Python backend
+MoneyPrinterTurbo/.venv/
+MoneyPrinterTurbo/__pycache__/
+MoneyPrinterTurbo/**/__pycache__/
+MoneyPrinterTurbo/**/*.pyc
+MoneyPrinterTurbo/storage/tasks/
+MoneyPrinterTurbo/storage/cache_videos/
+MoneyPrinterTurbo/storage/local_videos/
+MoneyPrinterTurbo/storage/bgmusic/
+MoneyPrinterTurbo/storage/temp/
+MoneyPrinterTurbo/.streamlit/secrets.toml
+
+# Next.js frontend
+mpt-ui/node_modules/
+mpt-ui/.next/
+mpt-ui/.env*.local
+mpt-ui/tsconfig.tsbuildinfo
+
+# Secrets — never commit
+MoneyPrinterTurbo/config.toml
+
+# Large binary assets (MP3, fonts) — too large for git, install manually
+MoneyPrinterTurbo/resource/songs/
+MoneyPrinterTurbo/resource/fonts/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
