@@ -16,9 +16,12 @@ import LogPanel, { makeLog, type LogEntry } from "@/components/LogPanel";
 // ─── Sub-fonts list (common ones available in the repo) ──────────────────────
 const FONTS = [
   "MicrosoftYaHeiBold.ttc",
+  "MicrosoftYaHeiNormal.ttc",
   "STHeitiMedium.ttc",
-  "Arial.ttf",
-  "Arial Bold.ttf",
+  "STHeitiLight.ttc",
+  "Charm-Bold.ttf",
+  "Charm-Regular.ttf",
+  "UTM Kabel KT.ttf",
 ];
 
 // ─── Estilos compartidos ──────────────────────────────────────────────────────

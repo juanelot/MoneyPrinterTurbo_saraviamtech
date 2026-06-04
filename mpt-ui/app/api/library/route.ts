@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-const STORAGE_DIR = "C:\\Users\\juan\\Desktop\\proyectosclaude\\MoneyPrinterTurbo(videos)\\MoneyPrinterTurbo\\storage";
+const STORAGE_DIR =
+  process.env.MPT_STORAGE_DIR ||
+  path.resolve(process.cwd(), "..", "MoneyPrinterTurbo", "storage");
 const TASKS_DIR = path.join(STORAGE_DIR, "tasks");
 const CACHE_DIR = path.join(STORAGE_DIR, "cache_videos");
 

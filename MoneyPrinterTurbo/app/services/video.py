@@ -506,6 +506,7 @@ def combine_videos(
     video_transition_mode: VideoTransitionMode = None,
     max_clip_duration: int = 5,
     threads: int = 2,
+    video_codec: str | None = None,
 ) -> str:
     audio_clip = AudioFileClip(audio_file)
     try:
@@ -632,7 +633,7 @@ def combine_videos(
             _write_videofile_with_codec_fallback(
                 clip,
                 clip_file,
-                codec=_get_configured_video_codec(),
+                codec=video_codec or _get_configured_video_codec(),
                 logger=None,
                 fps=fps,
             )
@@ -976,7 +977,7 @@ def generate_video(
     _write_videofile_with_codec_fallback(
         video_clip,
         output_file=output_file,
-        codec=_get_configured_video_codec(),
+        codec=params.video_codec or _get_configured_video_codec(),
         audio_codec=audio_codec,
         audio_fps=output_audio_fps,
         audio_bitrate=audio_bitrate,
