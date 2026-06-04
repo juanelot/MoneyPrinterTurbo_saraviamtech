@@ -77,6 +77,27 @@ git clone https://github.com/juanelot/MoneyPrinterTurbo_saraviamtech.git
 cd MoneyPrinterTurbo_saraviamtech
 ```
 
+### ⚠️ Obtener canciones y fuentes (paso obligatorio)
+
+Este repo no incluye los archivos binarios pesados (MP3 de música de fondo y fuentes TTF/TTC). Descárgalos del repositorio original:
+
+```bash
+# Opción A — clonar el repo original y copiar los recursos
+git clone https://github.com/harry0703/MoneyPrinterTurbo.git temp-original
+cp -r temp-original/resource/songs MoneyPrinterTurbo/resource/songs
+cp -r temp-original/resource/fonts MoneyPrinterTurbo/resource/fonts
+rm -rf temp-original
+```
+
+```bash
+# Opción B — descargar solo los recursos sin clonar todo
+# Ve a https://github.com/harry0703/MoneyPrinterTurbo y descarga manualmente
+# las carpetas resource/songs/ y resource/fonts/
+# y colócalas en MoneyPrinterTurbo/resource/
+```
+
+Sin las canciones el video se generará **sin música de fondo**. Sin las fuentes los **subtítulos fallarán**.
+
 ### 2. Configurar el backend
 
 ```bash
