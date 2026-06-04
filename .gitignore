@@ -19,10 +19,6 @@ mpt-ui/tsconfig.tsbuildinfo
 # Secrets — never commit
 MoneyPrinterTurbo/config.toml
 
-# Large binary assets (MP3, fonts) — too large for git, install manually
-MoneyPrinterTurbo/resource/songs/
-MoneyPrinterTurbo/resource/fonts/
-
 # OS
 .DS_Store
 Thumbs.db
