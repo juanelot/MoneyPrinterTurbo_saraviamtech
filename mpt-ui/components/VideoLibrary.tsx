@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Download, Trash2, Film, RefreshCw, HardDrive, Clock } from "lucide-react";
+import { Download, Trash2, Film, RefreshCw, HardDrive, Clock, Copy, Check, List } from "lucide-react";
 import type { VideoItem } from "@/app/api/library/route";
 
 function fmtSize(bytes: number) {
@@ -20,6 +20,15 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [showChapters, setShowChapters] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyChapters = async () => {
+    if (!video.chapters) return;
+    await navigator.clipboard.writeText(video.chapters);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
@@ -150,6 +159,57 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
           <p style={{ fontSize: 11, color: "#f87171", lineHeight: 1.5, marginTop: 2 }}>
             ✕ {deleteError}
           </p>
+        )}
+
+        {/* Capítulos YouTube */}
+        {video.chapters && (
+          <div style={{ marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={() => setShowChapters(!showChapters)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.2)",
+                background: showChapters ? "rgba(34,211,238,0.08)" : "rgba(34,211,238,0.04)",
+                color: "#67e8f9", fontSize: 12, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <List size={13} /> Capítulos YouTube
+              </span>
+              <span style={{ fontSize: 10, color: "#22d3ee" }}>{showChapters ? "▲" : "▼"}</span>
+            </button>
+
+            {showChapters && (
+              <div style={{
+                marginTop: 6, padding: "10px 12px", borderRadius: 10,
+                background: "rgba(0,0,0,0.4)", border: "1px solid rgba(34,211,238,0.15)",
+              }}>
+                <pre style={{
+                  fontSize: 11, color: "#a1a1aa", lineHeight: 1.8, margin: 0,
+                  whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "monospace",
+                  maxHeight: 180, overflowY: "auto",
+                }}>
+                  {video.chapters}
+                </pre>
+                <button
+                  type="button"
+                  onClick={handleCopyChapters}
+                  style={{
+                    marginTop: 8, width: "100%", display: "flex", alignItems: "center",
+                    justifyContent: "center", gap: 6, padding: "7px",
+                    borderRadius: 8, border: "none", cursor: "pointer",
+                    background: copied ? "rgba(52,211,153,0.15)" : "rgba(34,211,238,0.12)",
+                    color: copied ? "#34d399" : "#22d3ee",
+                    fontSize: 12, fontWeight: 600, transition: "all 0.2s",
+                  }}
+                >
+                  {copied ? <Check size={13} /> : <Copy size={13} />}
+                  {copied ? "¡Copiado!" : "Copiar para YouTube"}
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

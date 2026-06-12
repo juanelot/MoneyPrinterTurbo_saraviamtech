@@ -29,6 +29,13 @@ pexels_api_keys = []
 # 特别注意格式，Key 用英文双引号括起来，多个Key用逗号隔开
 pixabay_api_keys = []
 
+# Kie AI API Key — para el flujo "video de imágenes" estilo Zenn
+# (modelo gpt-image-2-text-to-image). Regístrate en https://kie.ai
+# Una sola key: kie_api_keys = "tu-key"   |   varias: kie_api_keys = ["k1","k2"]
+kie_api_keys = ""
+# Imágenes Kie a generar en paralelo (más = más rápido, pero ojo al rate-limit)
+kie_max_concurrency = 6
+
 # 支持的提供商 (Supported providers):
 #   openai
 #   aihubmix   (OpenAI-compatible AI model gateway)

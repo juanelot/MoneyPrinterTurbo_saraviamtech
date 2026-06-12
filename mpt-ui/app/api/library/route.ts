@@ -16,6 +16,7 @@ export interface VideoItem {
   streamUrl: string;
   downloadUrl: string;
   script?: string;
+  chapters?: string;  // texto listo para pegar en YouTube
 }
 
 // GET /api/library  → list all completed videos
@@ -71,6 +72,14 @@ export async function GET(req: NextRequest) {
           } catch { /* ignore */ }
         }
 
+        let chapters: string | undefined;
+        const chaptersPath = path.join(taskPath, "chapters.txt");
+        if (fs.existsSync(chaptersPath)) {
+          try {
+            chapters = fs.readFileSync(chaptersPath, "utf-8").trim();
+          } catch { /* ignore */ }
+        }
+
         videos.push({
           taskId,
           filename,
@@ -79,6 +88,7 @@ export async function GET(req: NextRequest) {
           streamUrl: `/api/mpt/v1/stream/${taskId}/${filename}`,
           downloadUrl: `/api/mpt/v1/download/${taskId}/${filename}`,
           script,
+          chapters,
         });
       }
     }
