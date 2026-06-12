@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Wand2, ChevronDown, ChevronUp, Mic, Music, Type, Image as ImageIcon,
-  Sparkles, Film, RefreshCw, Play, Clock, Trash2,
+  Sparkles, RefreshCw, Play, Clock, Trash2,
 } from "lucide-react";
 import type { TaskResult } from "@/app/page";
 import {
   getVoicesForServer, getUniqueLanguages, type TtsServer,
 } from "@/lib/voices";
 import LogPanel, { makeLog, type LogEntry } from "@/components/LogPanel";
+import { useT } from "@/lib/i18n";
 
 const FONTS = [
   "MicrosoftYaHeiBold.ttc", "MicrosoftYaHeiNormal.ttc",
@@ -86,11 +87,12 @@ interface Props {
 }
 
 function PromptCard({ index, scene, prompt }: { index: number; scene: string; prompt: string }) {
+  const { t } = useT();
   const [copied, setCopied] = useState(false);
   return (
     <div style={{ borderRadius: 10, border: "1px solid rgba(139,92,246,0.2)", background: "rgba(255,255,255,0.03)", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "rgba(139,92,246,0.08)", borderBottom: "1px solid rgba(139,92,246,0.15)" }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#c4b5fd" }}>Imagen #{index}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#c4b5fd" }}>{t("imageN", { n: index })}</span>
         <button type="button" onClick={async () => {
           await navigator.clipboard.writeText(prompt);
           setCopied(true);
@@ -101,7 +103,7 @@ function PromptCard({ index, scene, prompt }: { index: number; scene: string; pr
           background: copied ? "rgba(52,211,153,0.15)" : "rgba(139,92,246,0.15)",
           color: copied ? "#34d399" : "#a78bfa", fontSize: 11, fontWeight: 600,
         }}>
-          {copied ? "✓ Copiado" : "📋 Copiar prompt"}
+          {copied ? t("copiedCheck") : t("copyPrompt")}
         </button>
       </div>
       <div style={{ padding: "8px 12px" }}>
@@ -117,6 +119,8 @@ function PromptCard({ index, scene, prompt }: { index: number; scene: string; pr
 }
 
 export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }: Props) {
+  const { t } = useT();
+
   // Guión
   const [subject, setSubject]               = useState("");
   const [videoLanguage, setVideoLanguage]   = useState("");
@@ -140,6 +144,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
   const [localImgLoading, setLocalImgLoading] = useState(false);
   const [localImgUploading, setLocalImgUploading] = useState(false);
   const [localImgMsg, setLocalImgMsg]       = useState("");
+  const [localImgMsgError, setLocalImgMsgError] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const localImgRef = useRef<HTMLInputElement>(null);
 
@@ -158,7 +163,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
   const handleLocalImgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    setLocalImgUploading(true); setLocalImgMsg("");
+    setLocalImgUploading(true); setLocalImgMsg(""); setLocalImgMsgError(false);
     let uploaded = 0;
     for (const file of Array.from(files)) {
       const form = new FormData();
@@ -168,7 +173,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
         if (res.ok) uploaded++;
       } catch { /* skip */ }
     }
-    setLocalImgMsg(`✓ ${uploaded} imagen${uploaded !== 1 ? "es" : ""} subida${uploaded !== 1 ? "s" : ""}`);
+    setLocalImgMsg(t("imagesUploaded", { n: uploaded }));
     await loadLocalImages();
     setLocalImgUploading(false);
     if (localImgRef.current) localImgRef.current.value = "";
@@ -180,16 +185,17 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
   const handleClearAllImages = async () => {
     if (!confirmClear) { setConfirmClear(true); return; }
     setClearingImgs(true);
-    setLocalImgMsg("");
+    setLocalImgMsg(""); setLocalImgMsgError(false);
     try {
       const res = await fetch("/api/local-images?action=clear-all", { method: "DELETE" });
       const data = await res.json();
       const deleted = data?.deleted ?? 0;
       setSelectedImages([]);
       setLocalImages([]);
-      setLocalImgMsg(`✓ ${deleted} imagen${deleted !== 1 ? "es" : ""} eliminada${deleted !== 1 ? "s" : ""}`);
+      setLocalImgMsg(t("imagesDeleted", { n: deleted }));
     } catch {
-      setLocalImgMsg("Error al borrar imágenes");
+      setLocalImgMsg(t("errorDeletingImages"));
+      setLocalImgMsgError(true);
     } finally {
       setClearingImgs(false);
       setConfirmClear(false);
@@ -320,7 +326,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
   const handleGenerateScript = async () => {
     if (!subject.trim()) return;
     setGeneratingScript(true);
-    addLog("info", `Generando guión para: "${subject.trim()}"`);
+    addLog("info", t("logGenScript", { s: subject.trim() }));
     try {
       const res = await fetch("/api/mpt/v1/scripts", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -335,9 +341,9 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
       const data = await res.json();
       const script = data?.data?.video_script ?? "";
       setGeneratedScript(script);
-      addLog("success", `Guión generado (${script.length} chars)`);
+      addLog("success", t("logScriptDone", { n: script.length }));
     } catch (e) {
-      addLog("error", `Error generando guión: ${e instanceof Error ? e.message : "desconocido"}`);
+      addLog("error", t("logErrScript", { e: e instanceof Error ? e.message : t("unknownError") }));
     } finally { setGeneratingScript(false); }
   };
 
@@ -345,7 +351,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
     if (!voice || ttsServer === "no-voice") return;
     setPreviewLoading(true); setPreviewUrl(null); setPreviewError(null);
     try {
-      const text = generatedScript.slice(0, 300) || subject.trim() || "Hola, esta es una muestra de voz.";
+      const text = generatedScript.slice(0, 300) || subject.trim() || t("voiceSample");
       const res = await fetch("/api/mpt/v1/audio", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -356,7 +362,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const taskId = data?.data?.task_id;
-      if (!taskId) throw new Error("El servidor no devolvió task_id");
+      if (!taskId) throw new Error(t("logNoTaskId"));
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 2000));
         const r2 = await fetch(`/api/mpt/v1/tasks/${taskId}`);
@@ -372,10 +378,10 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
           }
           break;
         }
-        if (state === -1) throw new Error(d2?.data?.message || "Error al sintetizar voz");
+        if (state === -1) throw new Error(d2?.data?.message || t("logTtsError"));
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error desconocido";
+      const msg = e instanceof Error ? e.message : t("unknownError");
       addLog("error", msg); setPreviewError(msg);
     } finally { setPreviewLoading(false); }
   };
@@ -384,13 +390,17 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
     e.preventDefault();
     if (!subject.trim()) return;
     setLoading(true); setLogs([]); onLogsChange?.([]);
-    addLog("info", `Iniciando video de imágenes (Zenn): "${subject.trim()}"`);
-    addLog("info", `Fuente: ${imageSource === "local" ? `LOCAL (${selectedImages.length} imágenes)` : `Kie AI · 1K`} · ${aspect} · voz=${voice || "sin voz"}`);
+    addLog("info", t("logZennStart", { s: subject.trim() }));
+    addLog("info", t("logZennSource", {
+      src: imageSource === "local" ? t("logZennLocalSrc", { n: selectedImages.length }) : "Kie AI · 1K",
+      a: aspect,
+      v: voice || t("noVoiceSuffix"),
+    }));
 
     // Validar que si es local haya imágenes seleccionadas
     if (imageSource === "local" && selectedImages.length === 0) {
       setLoading(false);
-      onError("Modo local: debes seleccionar al menos una imagen antes de generar.");
+      onError(t("logLocalNeedImages"));
       return;
     }
 
@@ -436,20 +446,20 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
       }
       const data = await res.json();
       const taskId = data?.data?.task_id;
-      if (!taskId) throw new Error("No se recibió task_id del servidor");
+      if (!taskId) throw new Error(t("logNoTaskIdReceived"));
       await pollTask(taskId);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Error desconocido");
+      onError(err instanceof Error ? err.message : t("unknownError"));
     } finally { setLoading(false); }
   };
 
   const pollTask = async (taskId: string) => {
     const modeMsg = imageSource === "local"
-      ? `Tarea creada: ${taskId.slice(0, 8)}… — usando imágenes locales ($0.00 en Kie)`
-      : `Tarea creada: ${taskId.slice(0, 8)}… — generando imágenes con Kie AI…`;
+      ? t("logZennTaskLocal", { id: taskId.slice(0, 8) })
+      : t("logZennTaskKie", { id: taskId.slice(0, 8) });
     addLog("info", modeMsg);
     if (imageSource !== "local") {
-      addLog("debug", "Cada imagen se genera en Kie AI (~10–30s) y se sincroniza con la voz. Puede tardar varios minutos.");
+      addLog("debug", t("logZennKieHint"));
     }
     let lastProgress = -1;
     // 480 intentos × 5s = 40 min máximo (muchas imágenes)
@@ -463,29 +473,29 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
       const progress = taskData?.progress ?? 0;
       if (progress !== lastProgress) {
         const msg = progress >= 30 && progress < 82
-          ? `Progreso: ${progress}% — generando y descargando imágenes…`
+          ? t("logZennProgressImgs", { p: progress })
           : progress >= 82 && progress < 90
-          ? `Progreso: ${progress}% — armando video sincronizado…`
+          ? t("logZennProgressSync", { p: progress })
           : progress >= 90
-          ? `Progreso: ${progress}% — render final (voz + música + subtítulos)…`
-          : `Progreso: ${progress}%`;
+          ? t("logZennProgressRender", { p: progress })
+          : t("logProgress", { p: progress });
         addLog("info", msg);
         lastProgress = progress;
       }
       if (state === 1) {
         const videos: string[] = taskData?.videos ?? [];
         const imgCount = taskData?.image_count;
-        addLog("success", `¡Video listo!${imgCount ? ` ${imgCount} imágenes` : ""} → ${videos.length} archivo(s)`);
+        addLog("success", t("logZennReady", { i: imgCount ? t("logZennImgCount", { n: imgCount }) : "", n: videos.length }));
         onGenerated({ taskId, videos });
         return;
       }
       if (state === -1) {
-        const errMsg = taskData?.message || "La generación falló (state=-1)";
+        const errMsg = taskData?.message || t("logGenFailed");
         addLog("error", errMsg);
         throw new Error(errMsg);
       }
     }
-    throw new Error("Tiempo de espera agotado (40 min). Revisa 'Mis videos'.");
+    throw new Error(t("timeout40"));
   };
 
   return (
@@ -495,30 +505,30 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
       <div style={{ textAlign: "center", paddingBottom: 12 }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 14px", borderRadius: 99, background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.2)", marginBottom: 16 }}>
           <ImageIcon size={13} color="#22d3ee" />
-          <span style={{ fontSize: 13, color: "#67e8f9", fontWeight: 500 }}>Estilo Zenn · Imágenes IA</span>
+          <span style={{ fontSize: 13, color: "#67e8f9", fontWeight: 500 }}>{t("zennBadge")}</span>
         </div>
         <h1 style={{ fontSize: 38, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: 10 }}>
-          <span className="gradient-text">Videos de imágenes</span>
-          <br /><span style={{ color: "#fff" }}>sincronizadas con la voz</span>
+          <span className="gradient-text">{t("zennTitle1")}</span>
+          <br /><span style={{ color: "#fff" }}>{t("zennTitle2")}</span>
         </h1>
         <p style={{ color: "#71717a", fontSize: 15, maxWidth: 540, margin: "0 auto", lineHeight: 1.6 }}>
-          La IA genera el guión, la voz, y una imagen estilo dibujo por cada momento de la narración — sincronizadas automáticamente, como el canal Zenn.
+          {t("zennSubtitle")}
         </p>
       </div>
 
       {/* GUIÓN */}
       <div style={CARD}>
-        <SectionToggle open={openScript} onToggle={() => setOpenScript(!openScript)} icon={Sparkles} title="Guión del video" />
+        <SectionToggle open={openScript} onToggle={() => setOpenScript(!openScript)} icon={Sparkles} title={t("scriptSection")} />
         {openScript && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Field label="Tema del video *">
+            <Field label={t("subjectLabel")}>
               <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} required
-                placeholder="Ej: Cómo vivían los primeros humanos" style={INPUT} />
+                placeholder={t("zennSubjectPlaceholder")} style={INPUT} />
             </Field>
             <Row2>
-              <Field label="Idioma del guión">
+              <Field label={t("scriptLang")}>
                 <select value={videoLanguage} onChange={(e) => handleScriptLangChange(e.target.value)} style={SELECT}>
-                  <option value="">Auto detectar</option>
+                  <option value="">{t("autoDetect")}</option>
                   <option value="es-ES">Español (España)</option>
                   <option value="es-MX">Español (México)</option>
                   <option value="en-US">English (US)</option>
@@ -531,7 +541,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                   <option value="ko-KR">한국어</option>
                 </select>
               </Field>
-              <Field label="Número de párrafos">
+              <Field label={t("paragraphsLabel")}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {/* Atajos rápidos por duración */}
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -556,28 +566,28 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                       style={{ ...INPUT, width: 80 }}
                     />
                     <span style={{ fontSize: 12, color: "#52525b" }}>
-                      ≈ {Math.round(paragraphs * 50 / 150 * 60 / 60 * 100) / 100 < 1
-                        ? `${Math.round(paragraphs * 50 / 150 * 60)} seg`
-                        : `${(paragraphs * 50 / 150).toFixed(1)} min`} de video
+                      {Math.round(paragraphs * 50 / 150 * 60 / 60 * 100) / 100 < 1
+                        ? t("secVideo", { n: Math.round(paragraphs * 50 / 150 * 60) })
+                        : t("minVideo", { n: (paragraphs * 50 / 150).toFixed(1) })}
                     </span>
                   </div>
                 </div>
               </Field>
             </Row2>
-            <Field label="Instrucciones adicionales para el guión (opcional)">
+            <Field label={t("extraInstructions")}>
               <textarea value={scriptPrompt} onChange={(e) => setScriptPrompt(e.target.value)}
-                placeholder="Ej: tono narrativo, curioso, frases cortas..." rows={2} maxLength={2000}
+                placeholder={t("zennScriptPromptPlaceholder")} rows={2} maxLength={2000}
                 style={{ ...INPUT, resize: "vertical" }} />
             </Field>
             <button type="button" onClick={handleGenerateScript} disabled={!subject.trim() || generatingScript}
               style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10,
                 border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.12)", color: "#c4b5fd", fontSize: 14, fontWeight: 600 }}>
               {generatingScript ? <RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} /> : <Wand2 size={14} />}
-              {generatingScript ? "Generando guión…" : "Generar guión con IA"}
+              {generatingScript ? t("generatingScript") : t("generateScript")}
             </button>
-            <Field label="Guión (editable — vacío = la IA lo genera al crear el video)">
+            <Field label={t("zennScriptEditable")}>
               <textarea value={generatedScript} onChange={(e) => setGeneratedScript(e.target.value)}
-                placeholder="El guión aparecerá aquí, o escribe el tuyo..." rows={7} style={{ ...INPUT, resize: "vertical" }} />
+                placeholder={t("scriptPlaceholder")} rows={7} style={{ ...INPUT, resize: "vertical" }} />
             </Field>
           </div>
         )}
@@ -585,7 +595,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
 
       {/* IMÁGENES */}
       <div style={CARD}>
-        <SectionToggle open={openImages} onToggle={() => setOpenImages(!openImages)} icon={ImageIcon} title="Imágenes (estilo Zenn)" color="#22d3ee" />
+        <SectionToggle open={openImages} onToggle={() => setOpenImages(!openImages)} icon={ImageIcon} title={t("imagesSection")} color="#22d3ee" />
         {openImages && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
@@ -602,7 +612,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                   fontWeight: 700, fontSize: 13, transition: "all 0.2s",
                   borderRight: src === "kie" ? "1px solid rgba(255,255,255,0.1)" : "none",
                 }}>
-                  {src === "kie" ? "🤖 Kie AI (genera automático)" : "📁 Imágenes locales (sube las tuyas)"}
+                  {src === "kie" ? t("kieTab") : t("localImagesTab")}
                 </button>
               ))}
             </div>
@@ -612,14 +622,14 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
               <>
                 <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(34,211,238,0.07)", border: "1px solid rgba(34,211,238,0.15)" }}>
                   <p style={{ fontSize: 12, color: "#67e8f9", lineHeight: 1.6 }}>
-                    Se genera <strong>una imagen por cada segmento</strong> con Kie AI (gpt-image-2). El estilo se aplica a todas para mantener consistencia.
+                    {t("kieInfo")}
                   </p>
                 </div>
-                <Field label="Temática / nicho (se inyecta en cada imagen)">
+                <Field label={t("themeLabel")}>
                   <input type="text" value={kieTheme} onChange={(e) => setKieTheme(e.target.value)}
-                    placeholder="Ej: primitive humans, space, animals, aliens..." style={INPUT} />
+                    placeholder={t("themePlaceholder")} style={INPUT} />
                 </Field>
-                <Field label="Estilo visual (se aplica a TODAS las imágenes)">
+                <Field label={t("styleLabel")}>
                   <textarea value={kieStyle} onChange={(e) => setKieStyle(e.target.value)} rows={4}
                     style={{ ...INPUT, resize: "vertical", fontSize: 13 }} />
                 </Field>
@@ -631,7 +641,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
               <div style={{ padding: 16, borderRadius: 14, background: "rgba(34,211,238,0.05)", border: "1px solid rgba(34,211,238,0.15)" }}>
                 <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(34,211,238,0.07)", border: "1px solid rgba(34,211,238,0.12)", marginBottom: 14 }}>
                   <p style={{ fontSize: 12, color: "#67e8f9", lineHeight: 1.6 }}>
-                    Sube tus propias imágenes. Se distribuyen automáticamente sobre los segmentos de la voz — si subes menos imágenes que segmentos, se ciclan. <strong>Costo: $0</strong> en Kie AI.
+                    {t("localImagesInfo")}
                   </p>
                 </div>
 
@@ -648,8 +658,8 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                       border: "1px solid rgba(34,211,238,0.3)", background: "rgba(34,211,238,0.1)", color: "#22d3ee",
                       fontSize: 13, fontWeight: 600, cursor: localImgUploading ? "not-allowed" : "pointer" }}>
                     {localImgUploading
-                      ? <><RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} /> Subiendo…</>
-                      : <>+ Subir imágenes</>}
+                      ? <><RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} /> {t("uploading")}</>
+                      : <>{t("uploadImages")}</>}
                   </button>
                   <button type="button" onClick={loadLocalImages} disabled={localImgLoading}
                     style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)",
@@ -667,36 +677,36 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                           color: confirmClear ? "#f87171" : "#ef4444",
                           fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>
                         {clearingImgs
-                          ? <><RefreshCw size={13} style={{ animation: "spin-slow 1s linear infinite" }} /> Borrando…</>
-                          : <><Trash2 size={13} /> {confirmClear ? "¿Borrar todo?" : "Limpiar"}</>}
+                          ? <><RefreshCw size={13} style={{ animation: "spin-slow 1s linear infinite" }} /> {t("clearing")}</>
+                          : <><Trash2 size={13} /> {confirmClear ? t("confirmClearAll") : t("clean")}</>}
                       </button>
                       {confirmClear && !clearingImgs && (
                         <button type="button" onClick={() => setConfirmClear(false)}
                           style={{ fontSize: 12, color: "#52525b", background: "none", border: "none", cursor: "pointer" }}>
-                          Cancelar
+                          {t("cancel")}
                         </button>
                       )}
                     </>
                   )}
-                  {localImgMsg && <span style={{ fontSize: 12, color: localImgMsg.startsWith("Error") ? "#f87171" : "#34d399" }}>{localImgMsg}</span>}
+                  {localImgMsg && <span style={{ fontSize: 12, color: localImgMsgError ? "#f87171" : "#34d399" }}>{localImgMsg}</span>}
                 </div>
 
                 {/* Lista de imágenes disponibles */}
                 {localImages.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "20px 0" }}>
                     <p style={{ fontSize: 13, color: "#52525b" }}>
-                      {localImgLoading ? "Cargando…" : "No hay imágenes subidas aún."}
+                      {localImgLoading ? t("loadingDots") : t("noImagesYet")}
                     </p>
                     {!localImgLoading && (
                       <p style={{ fontSize: 11, color: "#3f3f46", marginTop: 4 }}>
-                        Dale a <strong style={{ color: "#22d3ee" }}>+ Subir imágenes</strong> para agregar JPG, PNG o WebP
+                        {t("uploadHint")}
                       </p>
                     )}
                   </div>
                 ) : (
                   <>
                     <p style={{ fontSize: 11, color: "#52525b", marginBottom: 8 }}>
-                      Selecciona y ordena las imágenes ({selectedImages.length} seleccionadas):
+                      {t("selectOrder", { n: selectedImages.length })}
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
                       {localImages.map((img) => {
@@ -747,12 +757,12 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                     <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                       <button type="button" onClick={() => setSelectedImages(localImages.map((m) => m.file))}
                         style={{ fontSize: 11, color: "#22d3ee", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                        Seleccionar todo
+                        {t("selectAll")}
                       </button>
                       <span style={{ color: "#3f3f46" }}>·</span>
                       <button type="button" onClick={() => setSelectedImages([])}
                         style={{ fontSize: 11, color: "#52525b", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                        Deseleccionar
+                        {t("deselect")}
                       </button>
                     </div>
                   </>
@@ -767,26 +777,26 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, color: "#c4b5fd" }}>
-                      📋 Guía de imágenes — {imagePrompts.length} prompts listos para copiar
+                      {t("promptGuideTitle", { n: imagePrompts.length })}
                     </p>
                     <p style={{ fontSize: 11, color: "#71717a", marginTop: 2 }}>
-                      Copia cada prompt, crea la imagen en GPT Image / Midjourney / etc., y súbela en orden.
+                      {t("promptGuideSub")}
                       {selectedImages.length > 0 && selectedImages.length !== imagePrompts.length && (
                         <span style={{ color: "#f87171", marginLeft: 6 }}>
-                          ⚠ Tienes {selectedImages.length} imágenes — necesitas {imagePrompts.length}
+                          {t("haveNeed", { have: selectedImages.length, need: imagePrompts.length })}
                           {selectedImages.length < imagePrompts.length
-                            ? ` (faltan ${imagePrompts.length - selectedImages.length})`
-                            : ` (sobran ${selectedImages.length - imagePrompts.length})`}
+                            ? t("missingN", { n: imagePrompts.length - selectedImages.length })
+                            : t("surplusN", { n: selectedImages.length - imagePrompts.length })}
                         </span>
                       )}
                       {selectedImages.length === imagePrompts.length && (
-                        <span style={{ color: "#34d399", marginLeft: 6 }}>✓ Cantidad correcta</span>
+                        <span style={{ color: "#34d399", marginLeft: 6 }}>{t("correctCount")}</span>
                       )}
                     </p>
                   </div>
                   {/* Copiar todos */}
                   <button type="button" onClick={async () => {
-                    const all = imagePrompts.map((p) => `=== Imagen ${p.index} ===\n${p.prompt}`).join("\n\n");
+                    const all = imagePrompts.map((p) => `${t("imageHeaderN", { n: p.index })}\n${p.prompt}`).join("\n\n");
                     await navigator.clipboard.writeText(all);
                     setCopiedAll(true);
                     setTimeout(() => setCopiedAll(false), 2000);
@@ -797,7 +807,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                     color: copiedAll ? "#34d399" : "#a78bfa",
                     fontSize: 12, fontWeight: 700,
                   }}>
-                    {copiedAll ? "✓ ¡Copiados!" : "📋 Copiar todos"}
+                    {copiedAll ? t("copiedAll") : t("copyAll")}
                   </button>
                 </div>
 
@@ -810,7 +820,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
               </div>
             )}
 
-            <Field label="Formato (aspect ratio)">
+            <Field label={t("aspectLabel")}>
               <div style={{ display: "flex", gap: 10 }}>
                 {([
                   { ratio: "9:16", sub: "TikTok / Shorts", w: 22, h: 38 },
@@ -836,7 +846,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
 
             {/* Duración mínima solo aplica a Kie (resolución fija en 1K = 6 créditos/imagen) */}
             {imageSource === "kie" && (
-              <Field label={`Duración mín. por imagen · ${minImageDuration.toFixed(1)}s`}>
+              <Field label={t("minImgDurLabel", { n: minImageDuration.toFixed(1) })}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Clock size={13} color="#52525b" style={{ flexShrink: 0 }} />
                   <input type="range" min={1} max={6} step={0.5} value={minImageDuration}
@@ -846,7 +856,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
             )}
             {imageSource === "local" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <Field label={`Duración mín. por imagen · ${minImageDuration.toFixed(1)}s`}>
+                <Field label={t("minImgDurLabel", { n: minImageDuration.toFixed(1) })}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Clock size={13} color="#52525b" style={{ flexShrink: 0 }} />
                     <input type="range" min={1} max={60} step={0.5} value={minImageDuration}
@@ -859,13 +869,13 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                   <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(34,211,238,0.07)", border: "1px solid rgba(34,211,238,0.15)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                     <div>
                       <p style={{ fontSize: 12, color: "#67e8f9", fontWeight: 600, marginBottom: 2 }}>
-                        Ajuste automático para {selectedImages.length} imágenes
+                        {t("autoAdjustFor", { n: selectedImages.length })}
                       </p>
                       <p style={{ fontSize: 11, color: "#52525b" }}>
                         {(() => {
                           const audioSec = (estimate.words / (150 * voiceRate)) * 60;
                           const ideal = audioSec / selectedImages.length;
-                          return `≈ ${audioSec.toFixed(0)}s audio ÷ ${selectedImages.length} img = ${ideal.toFixed(1)}s por imagen`;
+                          return t("autoAdjustCalc", { sec: audioSec.toFixed(0), n: selectedImages.length, d: ideal.toFixed(1) });
                         })()}
                       </p>
                     </div>
@@ -878,20 +888,18 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                       background: "rgba(34,211,238,0.2)", color: "#22d3ee",
                       fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
                     }}>
-                      ⚡ Ajustar automáticamente
+                      {t("autoAdjustBtn")}
                     </button>
                   </div>
                 )}
               </div>
             )}
             <p style={{ fontSize: 11, color: "#52525b", marginTop: -4 }}>
-              {imageSource === "kie"
-                ? "Menor duración = más imágenes (más viral, pero más créditos). Zenn cambia cada ~2–3s."
-                : "Se usan TODAS las imágenes que selecciones, repartidas en orden a lo largo del audio. La duración mín. solo afecta el cálculo orientativo de arriba."}
+              {imageSource === "kie" ? t("kieDurHint") : t("localDurHint")}
             </p>
 
             {imageSource === "kie" && (
-              <Field label="Tope máximo de imágenes (0 = sin tope)">
+              <Field label={t("maxImagesLabel")}>
                 <input type="number" min={0} max={500} value={maxImages}
                   onChange={(e) => setMaxImages(Math.max(0, Number(e.target.value) || 0))}
                   placeholder="0" style={INPUT} />
@@ -904,32 +912,32 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                   <ImageIcon size={15} color="#22d3ee" />
                   <span style={{ fontSize: 13, color: "#a1a1aa" }}>
-                    {imageSource === "local" ? "Estimado (imágenes locales)" : `Estimado${estimate.approx ? " (aprox.)" : ""}`}
+                    {imageSource === "local" ? t("estimateLocal") : `${t("estimateWord")}${estimate.approx ? t("approxSuffix") : ""}`}
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "#67e8f9" }}>
                     {imageSource === "local"
-                      ? `${selectedImages.length} imágenes`
-                      : `≈ ${estimate.images} imágenes`}
+                      ? t("nImagesBold", { n: selectedImages.length })
+                      : t("approxImages", { n: estimate.images })}
                   </span>
                   {imageSource === "kie" && (
                     <>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "#c4b5fd" }}>{estimate.credits} créditos</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#c4b5fd" }}>{t("nCredits", { n: estimate.credits })}</span>
                       <span style={{ fontSize: 14, fontWeight: 700, color: "#34d399" }}>≈ ${estimate.usd.toFixed(2)}</span>
                     </>
                   )}
                   {imageSource === "local" && (
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#34d399" }}>$0.00 — sin costo Kie</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#34d399" }}>{t("noKieCost")}</span>
                   )}
-                  <span style={{ fontSize: 14, color: "#71717a" }}>~{estimate.durLabel} video</span>
+                  <span style={{ fontSize: 14, color: "#71717a" }}>{t("videoDurEst", { d: estimate.durLabel })}</span>
                 </div>
               </div>
             </div>
 
-            <Field label="Codec de video">
+            <Field label={t("codecLabel")}>
               <select value={codec} onChange={(e) => setCodec(e.target.value)} style={SELECT}>
-                <option value="libx264" style={{ background: "#0d0d0d" }}>libx264 — CPU (universal)</option>
+                <option value="libx264" style={{ background: "#0d0d0d" }}>{t("codecCpu")}</option>
                 <option value="h264_nvenc" style={{ background: "#0d0d0d" }}>h264_nvenc — NVIDIA</option>
                 <option value="h264_amf" style={{ background: "#0d0d0d" }}>h264_amf — AMD</option>
                 <option value="h264_qsv" style={{ background: "#0d0d0d" }}>h264_qsv — Intel QSV</option>
@@ -941,13 +949,13 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
 
       {/* VOZ */}
       <div style={CARD}>
-        <SectionToggle open={openAudio} onToggle={() => setOpenAudio(!openAudio)} icon={Mic} title="Voz y audio" color="#34d399" />
+        <SectionToggle open={openAudio} onToggle={() => setOpenAudio(!openAudio)} icon={Mic} title={t("voiceAudioSection")} color="#34d399" />
         {openAudio && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Field label="Servidor de síntesis de voz (TTS)">
+            <Field label={t("ttsServerLabel")}>
               <select value={ttsServer} onChange={(e) => handleTtsServerChange(e.target.value as TtsServer)} style={SELECT}>
-                <option value="no-voice" style={{ background: "#0d0d0d" }}>Sin voz</option>
-                <option value="azure-tts-v1" style={{ background: "#0d0d0d" }}>Azure TTS V1 (gratis, recomendado)</option>
+                <option value="no-voice" style={{ background: "#0d0d0d" }}>{t("noVoice")}</option>
+                <option value="azure-tts-v1" style={{ background: "#0d0d0d" }}>{t("azureV1")}</option>
                 <option value="azure-tts-v2" style={{ background: "#0d0d0d" }}>Azure TTS V2</option>
                 <option value="siliconflow" style={{ background: "#0d0d0d" }}>SiliconFlow TTS</option>
                 <option value="gemini-tts" style={{ background: "#0d0d0d" }}>Google Gemini TTS</option>
@@ -958,13 +966,13 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
             {ttsServer !== "no-voice" && (
               <>
                 {(ttsServer === "azure-tts-v1" || ttsServer === "azure-tts-v2") && langs.length > 1 && (
-                  <Field label="Filtrar voces por idioma">
+                  <Field label={t("filterVoicesByLang")}>
                     <select value={voiceLangFilter} onChange={(e) => handleLangChange(e.target.value)} style={SELECT}>
                       {langs.map((l) => <option key={l} value={l} style={{ background: "#0d0d0d" }}>{l}</option>)}
                     </select>
                   </Field>
                 )}
-                <Field label="Voz del narrador">
+                <Field label={t("narratorVoice")}>
                   <select value={voice} onChange={(e) => setVoice(e.target.value)} style={SELECT}>
                     {filteredVoices.map((v) => (
                       <option key={v.value} value={v.value} style={{ background: "#0d0d0d" }}>
@@ -981,7 +989,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
                         fontSize: 14, fontWeight: 600, cursor: (!voice || previewLoading) ? "not-allowed" : "pointer",
                         opacity: (!voice || previewLoading) ? 0.5 : 1 }}>
                       {previewLoading ? <RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} /> : <Play size={14} />}
-                      {previewLoading ? "Generando audio…" : "▶ Probar voz"}
+                      {previewLoading ? t("generatingAudio") : t("testVoice")}
                     </button>
                     {previewUrl && <audio src={previewUrl} controls autoPlay style={{ height: 36, borderRadius: 8, flex: 1, minWidth: 200 }} />}
                   </div>
@@ -994,12 +1002,12 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
             )}
 
             <Row2>
-              <Field label={`Velocidad de voz · ${voiceRate.toFixed(1)}x`}>
+              <Field label={t("voiceRateLabel", { n: voiceRate.toFixed(1) })}>
                 <select value={voiceRate} onChange={(e) => setVoiceRate(Number(e.target.value))} style={SELECT}>
                   {[0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5].map((r) => <option key={r} value={r} style={{ background: "#0d0d0d" }}>{r}x</option>)}
                 </select>
               </Field>
-              <Field label={`Volumen de voz · ${voiceVolume}x`}>
+              <Field label={t("voiceVolumeLabel", { n: voiceVolume })}>
                 <select value={voiceVolume} onChange={(e) => setVoiceVolume(Number(e.target.value))} style={SELECT}>
                   {[0.6, 0.8, 1.0, 1.2, 1.5, 2.0].map((v) => <option key={v} value={v} style={{ background: "#0d0d0d" }}>{v}x</option>)}
                 </select>
@@ -1007,13 +1015,13 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
             </Row2>
 
             <Row2>
-              <Field label="Música de fondo">
+              <Field label={t("bgmLabel")}>
                 <select value={bgmType} onChange={(e) => setBgmType(e.target.value)} style={SELECT}>
-                  <option value="" style={{ background: "#0d0d0d" }}>Sin música</option>
-                  <option value="random" style={{ background: "#0d0d0d" }}>Aleatoria</option>
+                  <option value="" style={{ background: "#0d0d0d" }}>{t("noMusic")}</option>
+                  <option value="random" style={{ background: "#0d0d0d" }}>{t("randomMusic")}</option>
                 </select>
               </Field>
-              <Field label={`Volumen BGM · ${Math.round(bgmVolume * 100)}%`}>
+              <Field label={t("bgmVolumeLabel", { n: Math.round(bgmVolume * 100) })}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Music size={13} color="#52525b" style={{ flexShrink: 0 }} />
                   <input type="range" min={0} max={1} step={0.05} value={bgmVolume}
@@ -1027,46 +1035,46 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
 
       {/* SUBTÍTULOS */}
       <div style={CARD}>
-        <SectionToggle open={openSubs} onToggle={() => setOpenSubs(!openSubs)} icon={Type} title="Subtítulos" color="#f59e0b" />
+        <SectionToggle open={openSubs} onToggle={() => setOpenSubs(!openSubs)} icon={Type} title={t("subtitlesSection")} color="#f59e0b" />
         {openSubs && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <span style={{ fontSize: 13, color: "#a1a1aa" }}>Subtítulos quemados en el video</span>
+              <span style={{ fontSize: 13, color: "#a1a1aa" }}>{t("burnedSubtitles")}</span>
               <Toggle value={subtitles} onChange={setSubtitles} />
             </div>
             {subtitles && (
               <>
                 <Row2>
-                  <Field label="Fuente">
+                  <Field label={t("fontLabel")}>
                     <select value={fontName} onChange={(e) => setFontName(e.target.value)} style={SELECT}>
                       {FONTS.map((f) => <option key={f} value={f} style={{ background: "#0d0d0d" }}>{f}</option>)}
                     </select>
                   </Field>
-                  <Field label="Posición">
+                  <Field label={t("positionLabel")}>
                     <select value={subtitlePos} onChange={(e) => setSubtitlePos(e.target.value)} style={SELECT}>
-                      <option value="top" style={{ background: "#0d0d0d" }}>Arriba</option>
-                      <option value="center" style={{ background: "#0d0d0d" }}>Centro</option>
-                      <option value="bottom" style={{ background: "#0d0d0d" }}>Abajo</option>
+                      <option value="top" style={{ background: "#0d0d0d" }}>{t("posTop")}</option>
+                      <option value="center" style={{ background: "#0d0d0d" }}>{t("posCenter")}</option>
+                      <option value="bottom" style={{ background: "#0d0d0d" }}>{t("posBottom")}</option>
                     </select>
                   </Field>
                 </Row2>
                 <Row2>
-                  <Field label={`Tamaño de fuente · ${fontSize}px`}>
+                  <Field label={t("fontSizeLabel", { n: fontSize })}>
                     <input type="range" min={30} max={100} step={2} value={fontSize} onChange={(e) => setFontSize(Number(e.target.value))} />
                   </Field>
-                  <Field label={`Grosor del contorno · ${strokeWidth}`}>
+                  <Field label={t("strokeWidthLabel", { n: strokeWidth })}>
                     <input type="range" min={0} max={10} step={0.5} value={strokeWidth} onChange={(e) => setStrokeWidth(parseFloat(e.target.value))} />
                   </Field>
                 </Row2>
                 <Row2>
-                  <Field label="Color del texto">
+                  <Field label={t("textColorLabel")}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)}
                         style={{ width: 40, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "none", cursor: "pointer", padding: 2 }} />
                       <code style={{ fontSize: 13, color: "#71717a" }}>{textColor}</code>
                     </div>
                   </Field>
-                  <Field label="Color del contorno">
+                  <Field label={t("strokeColorLabel")}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <input type="color" value={strokeColor} onChange={(e) => setStrokeColor(e.target.value)}
                         style={{ width: 40, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "none", cursor: "pointer", padding: 2 }} />
@@ -1081,7 +1089,7 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
       </div>
 
       {logs.length > 0 && (
-        <div style={{ marginBottom: 4 }}><LogPanel logs={logs} title="Actividad" maxHeight={200} /></div>
+        <div style={{ marginBottom: 4 }}><LogPanel logs={logs} title={t("activity")} maxHeight={200} /></div>
       )}
 
       <div style={{ paddingTop: 8, paddingBottom: 40 }}>
@@ -1094,15 +1102,15 @@ export default function ZennForm({ onStart, onGenerated, onError, onLogsChange }
         }}>
           <ImageIcon size={20} />
           {loading
-            ? "Generando video…"
+            ? t("creatingVideo")
             : imageSource === "local"
-            ? `Crear video · ${selectedImages.length} img · $0.00`
-            : `Crear video · ≈ ${estimate.images} img · ${estimate.credits} créditos · $${estimate.usd.toFixed(2)}`}
+            ? t("createVideoLocal", { n: selectedImages.length })
+            : t("createVideoKie", { n: estimate.images, c: estimate.credits, usd: estimate.usd.toFixed(2) })}
         </button>
         <p style={{ textAlign: "center", fontSize: 12, color: "#3f3f46", marginTop: 8 }}>
-          {paragraphs} párrafo{paragraphs > 1 ? "s" : ""} · {aspect} · 1K · {kieTheme || "general"}
-          {maxImages > 0 ? ` · máx ${maxImages} img` : ""}
-          {ttsServer !== "no-voice" ? ` · ${voice.split("-").slice(0,3).join("-")}` : " · sin voz"}
+          {paragraphs} {paragraphs > 1 ? t("paragraphsWord") : t("paragraphWord")} · {aspect} · 1K · {kieTheme || "general"}
+          {maxImages > 0 ? ` · ${t("maxImgShort", { n: maxImages })}` : ""}
+          {ttsServer !== "no-voice" ? ` · ${voice.split("-").slice(0,3).join("-")}` : ` · ${t("noVoiceSuffix")}`}
         </p>
       </div>
     </form>

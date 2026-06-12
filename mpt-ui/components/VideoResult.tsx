@@ -2,6 +2,7 @@
 
 import { Download, RotateCcw, CheckCircle, FolderOpen } from "lucide-react";
 import type { TaskResult } from "@/app/page";
+import { useT } from "@/lib/i18n";
 
 interface Props {
   result: TaskResult;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function VideoResult({ result, onReset, onViewLibrary }: Props) {
+  const { t } = useT();
   const filename = result.videos[0]?.split("/").pop() ?? result.videos[0];
 
   const videoUrl = filename
@@ -31,12 +33,12 @@ export default function VideoResult({ result, onReset, onViewLibrary }: Props) {
           background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", color: "#34d399",
         }}>
           <CheckCircle size={15} />
-          Video generado exitosamente
+          {t("successBadge")}
         </div>
       </div>
 
       <h2 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", textAlign: "center", marginBottom: 32, letterSpacing: "-0.02em" }}>
-        Tu video está listo
+        {t("videoReady")}
       </h2>
 
       {/* Video player */}
@@ -75,7 +77,7 @@ export default function VideoResult({ result, onReset, onViewLibrary }: Props) {
             }}
           >
             <Download size={18} />
-            Descargar video
+            {t("downloadVideo")}
           </a>
         )}
         <button
@@ -88,7 +90,7 @@ export default function VideoResult({ result, onReset, onViewLibrary }: Props) {
           }}
         >
           <RotateCcw size={18} />
-          Nuevo video
+          {t("newVideo")}
         </button>
       </div>
       {onViewLibrary && (
@@ -101,7 +103,7 @@ export default function VideoResult({ result, onReset, onViewLibrary }: Props) {
             fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 16,
           }}
         >
-          Ver todos mis videos →
+          {t("viewAllMyVideos")}
         </button>
       )}
 
@@ -113,11 +115,11 @@ export default function VideoResult({ result, onReset, onViewLibrary }: Props) {
       }}>
         <FolderOpen size={15} color="#52525b" style={{ marginTop: 2, flexShrink: 0 }} />
         <p style={{ fontSize: 13, color: "#52525b", lineHeight: 1.6 }}>
-          El archivo también está guardado en{" "}
+          {t("savedAtPrefix")}{" "}
           <code style={{ color: "#a1a1aa", fontSize: 12, background: "rgba(255,255,255,0.06)", padding: "1px 6px", borderRadius: 4 }}>
             storage/tasks/{result.taskId.slice(0, 8)}…/final-1.mp4
           </code>{" "}
-          dentro de la carpeta de MoneyPrinterTurbo.
+          {t("savedAtSuffix")}
         </p>
       </div>
     </div>

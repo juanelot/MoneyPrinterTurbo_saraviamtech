@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Download, Trash2, Film, RefreshCw, HardDrive, Clock, Copy, Check, List } from "lucide-react";
 import type { VideoItem } from "@/app/api/library/route";
+import { useT } from "@/lib/i18n";
 
 function fmtSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -16,6 +17,7 @@ function fmtDate(epoch: number) {
 }
 
 function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void }) {
+  const { t } = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -49,7 +51,7 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
       const res = await fetch(`/api/library?taskId=${video.taskId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok || data.error) {
-        setDeleteError(data.error ?? "Error al eliminar");
+        setDeleteError(data.error ?? t("errorDeleting"));
         setDeleting(false);
         setConfirmDelete(false);
       } else {
@@ -123,7 +125,7 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
               color: "#fff", fontSize: 13, fontWeight: 600,
             }}
           >
-            <Download size={14} /> Descargar
+            <Download size={14} /> {t("download")}
           </a>
 
           <button
@@ -140,7 +142,7 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
             {deleting
               ? <RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} />
               : <Trash2 size={14} />}
-            {confirmDelete ? "¿Seguro?" : "Eliminar"}
+            {confirmDelete ? t("confirmSure") : t("deleteWord")}
           </button>
         </div>
 
@@ -152,7 +154,7 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
               background: "none", color: "#52525b", fontSize: 12, cursor: "pointer",
             }}
           >
-            Cancelar
+            {t("cancel")}
           </button>
         )}
         {deleteError && (
@@ -175,7 +177,7 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
               }}
             >
               <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <List size={13} /> Capítulos YouTube
+                <List size={13} /> {t("ytChapters")}
               </span>
               <span style={{ fontSize: 10, color: "#22d3ee" }}>{showChapters ? "▲" : "▼"}</span>
             </button>
@@ -205,7 +207,7 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
                   }}
                 >
                   {copied ? <Check size={13} /> : <Copy size={13} />}
-                  {copied ? "¡Copiado!" : "Copiar para YouTube"}
+                  {copied ? t("copiedExcl") : t("copyForYt")}
                 </button>
               </div>
             )}
@@ -219,6 +221,7 @@ function VideoCard({ video, onDelete }: { video: VideoItem; onDelete: () => void
 interface CacheInfo { count: number; sizeBytes: number; }
 
 export default function VideoLibrary() {
+  const { t } = useT();
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -254,7 +257,7 @@ export default function VideoLibrary() {
       const res = await fetch("/api/library?action=clear-cache", { method: "DELETE" });
       const data = await res.json();
       if (data.ok) {
-        setCacheMsg(`✓ ${data.deleted} clips eliminados`);
+        setCacheMsg(t("clipsDeleted", { n: data.deleted }));
         setCacheInfo({ count: 0, sizeBytes: 0 });
       } else {
         setCacheMsg(`Error: ${data.error}`);
@@ -278,7 +281,7 @@ export default function VideoLibrary() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
             <Film size={20} color="#a78bfa" />
             <h2 style={{ fontSize: 24, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>
-              Mis videos
+              {t("tabLibrary")}
             </h2>
             <span style={{
               fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
@@ -289,7 +292,7 @@ export default function VideoLibrary() {
             </span>
           </div>
           <p style={{ fontSize: 13, color: "#52525b" }}>
-            Videos generados guardados localmente
+            {t("savedLocally")}
           </p>
         </div>
 
@@ -304,7 +307,7 @@ export default function VideoLibrary() {
           }}
         >
           <RefreshCw size={14} style={loading ? { animation: "spin-slow 1s linear infinite" } : {}} />
-          Actualizar
+          {t("refresh")}
         </button>
       </div>
 
@@ -318,7 +321,7 @@ export default function VideoLibrary() {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <HardDrive size={15} color="#71717a" />
             <span style={{ fontSize: 13, color: "#71717a" }}>
-              Caché de clips: <strong style={{ color: "#a1a1aa" }}>{cacheInfo.count} archivos</strong>
+              {t("cacheOfClips")} <strong style={{ color: "#a1a1aa" }}>{t("nFiles", { n: cacheInfo.count })}</strong>
               {" · "}<strong style={{ color: "#a1a1aa" }}>{fmtSize(cacheInfo.sizeBytes)}</strong>
             </span>
             {cacheMsg && (
@@ -333,7 +336,7 @@ export default function VideoLibrary() {
                 padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)",
                 background: "none", color: "#52525b", fontSize: 12, cursor: "pointer",
               }}>
-                Cancelar
+                {t("cancel")}
               </button>
             )}
             <button
@@ -351,7 +354,7 @@ export default function VideoLibrary() {
               {clearingCache
                 ? <RefreshCw size={12} style={{ animation: "spin-slow 1s linear infinite" }} />
                 : <Trash2 size={12} />}
-              {confirmClearCache ? "¿Limpiar todo?" : "Limpiar caché"}
+              {confirmClearCache ? t("confirmClearCache") : t("clearCache")}
             </button>
           </div>
         </div>
@@ -371,9 +374,9 @@ export default function VideoLibrary() {
             display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
             <Film size={30} color="#3f3f46" />
           </div>
-          <p style={{ color: "#52525b", fontSize: 15, fontWeight: 600 }}>Sin videos todavía</p>
+          <p style={{ color: "#52525b", fontSize: 15, fontWeight: 600 }}>{t("noVideosYet")}</p>
           <p style={{ color: "#3f3f46", fontSize: 13, marginTop: 6 }}>
-            Genera tu primer video y aparecerá aquí
+            {t("firstVideoHint")}
           </p>
         </div>
       )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Terminal } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 export interface LogEntry {
   time: string;
@@ -38,6 +39,7 @@ export function makeLog(level: LogEntry["level"], msg: string): LogEntry {
 }
 
 export default function LogPanel({ logs, title = "Logs", maxHeight = 260 }: Props) {
+  const { t } = useT();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,7 +76,7 @@ export default function LogPanel({ logs, title = "Logs", maxHeight = 260 }: Prop
       <div style={{ maxHeight, overflowY: "auto", padding: "10px 4px" }}>
         {logs.length === 0 ? (
           <p style={{ fontSize: 12, color: "#3f3f46", padding: "4px 12px" }}>
-            Sin actividad todavía…
+            {t("noActivity")}
           </p>
         ) : (
           logs.map((entry, i) => (

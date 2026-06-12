@@ -3,15 +3,15 @@
 import { useState, useRef, useMemo } from "react";
 import {
   Wand2, ChevronDown, ChevronUp, Mic, Music, Type,
-  Layers, Clock, Sparkles, Settings, Film, RefreshCw,
-  Play, Square, Volume2, Key, Plus, Trash2, Eye, EyeOff,
+  Sparkles, Film, RefreshCw,
+  Play, Key, Plus,
 } from "lucide-react";
 import type { TaskResult } from "@/app/page";
 import {
-  AZURE_VOICES, AZURE_V2_VOICES, SILICONFLOW_VOICES, GEMINI_VOICES, MIMO_VOICES,
   getVoicesForServer, getUniqueLanguages, type TtsServer,
 } from "@/lib/voices";
 import LogPanel, { makeLog, type LogEntry } from "@/components/LogPanel";
+import { useT } from "@/lib/i18n";
 
 // ─── Sub-fonts list (common ones available in the repo) ──────────────────────
 const FONTS = [
@@ -103,6 +103,7 @@ interface Props {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function VideoForm({ onStart, onGenerated, onError, onLogsChange }: Props) {
+  const { t } = useT();
 
   // ── Guión ──────────────────────────────────────────────────────────────────
   const [subject, setSubject]               = useState("");
@@ -157,7 +158,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
         if (res.ok) uploaded++;
       } catch { /* skip */ }
     }
-    setLocalUploadMsg(`✓ ${uploaded} archivo${uploaded !== 1 ? "s" : ""} subido${uploaded !== 1 ? "s" : ""}`);
+    setLocalUploadMsg(t("filesUploaded", { n: uploaded }));
     await loadLocalMaterials();
     setLocalUploading(false);
     if (localFileRef.current) localFileRef.current.value = "";
@@ -213,7 +214,6 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
   // ── API Keys panel ─────────────────────────────────────────────────────────
   const [pexelsNewKey, setPexelsNewKey]     = useState("");
   const [pixabayNewKey, setPixabayNewKey]   = useState("");
-  const [showKeys, setShowKeys]             = useState(false);
 
   // ── Secciones abiertas/cerradas ────────────────────────────────────────────
   const [openScript, setOpenScript]         = useState(true);
@@ -257,7 +257,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
   const handleGenerateScript = async () => {
     if (!subject.trim()) return;
     setGeneratingScript(true);
-    addLog("info", `Generando guión para: "${subject.trim()}" (${paragraphs} párrafo${paragraphs > 1 ? "s" : ""})`);
+    addLog("info", t("logGenScriptP", { s: subject.trim(), p: `${paragraphs}p` }));
     try {
       const res = await fetch("/api/mpt/v1/scripts", {
         method: "POST",
@@ -274,12 +274,12 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
       const data = await res.json();
       const script = data?.data?.video_script ?? "";
       setGeneratedScript(script);
-      addLog("success", `Guión generado (${script.length} chars)`);
+      addLog("success", t("logScriptDone", { n: script.length }));
 
       // Auto-generar términos si hay guión
       if (script) {
         setGeneratingTerms(true);
-        addLog("info", "Generando keywords automáticamente…");
+        addLog("info", t("logGenKeywordsAuto"));
         try {
           const res2 = await fetch("/api/mpt/v1/terms", {
             method: "POST",
@@ -289,14 +289,14 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
           if (res2.ok) {
             const d2 = await res2.json();
             const terms = d2?.data?.video_terms;
-            if (Array.isArray(terms)) { setVideoTerms(terms.join(", ")); addLog("success", `Keywords: ${terms.join(", ")}`); }
-            else if (typeof terms === "string") { setVideoTerms(terms); addLog("success", `Keywords: ${terms}`); }
+            if (Array.isArray(terms)) { setVideoTerms(terms.join(", ")); addLog("success", t("logKeywords", { k: terms.join(", ") })); }
+            else if (typeof terms === "string") { setVideoTerms(terms); addLog("success", t("logKeywords", { k: terms })); }
           }
         } finally { setGeneratingTerms(false); }
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error desconocido";
-      addLog("error", `Error generando guión: ${msg}`);
+      const msg = e instanceof Error ? e.message : t("unknownError");
+      addLog("error", t("logErrScript", { e: msg }));
     } finally { setGeneratingScript(false); }
   };
 
@@ -304,7 +304,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
   const handleGenerateTerms = async () => {
     if (!subject.trim()) return;
     setGeneratingTerms(true);
-    addLog("info", "Generando keywords de búsqueda…");
+    addLog("info", t("logGenKeywords"));
     try {
       const res = await fetch("/api/mpt/v1/terms", {
         method: "POST",
@@ -318,11 +318,11 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const terms = data?.data?.video_terms;
-      if (Array.isArray(terms)) { setVideoTerms(terms.join(", ")); addLog("success", `Keywords: ${terms.join(", ")}`); }
-      else if (typeof terms === "string") { setVideoTerms(terms); addLog("success", `Keywords: ${terms}`); }
+      if (Array.isArray(terms)) { setVideoTerms(terms.join(", ")); addLog("success", t("logKeywords", { k: terms.join(", ") })); }
+      else if (typeof terms === "string") { setVideoTerms(terms); addLog("success", t("logKeywords", { k: terms })); }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error desconocido";
-      addLog("error", `Error generando keywords: ${msg}`);
+      const msg = e instanceof Error ? e.message : t("unknownError");
+      addLog("error", t("logErrKeywords", { e: msg }));
     } finally { setGeneratingTerms(false); }
   };
 
@@ -332,10 +332,10 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
     setPreviewLoading(true);
     setPreviewUrl(null);
     setPreviewError(null);
-    addLog("info", `Iniciando preview de voz: ${voice}`);
+    addLog("info", t("logPreviewVoice", { v: voice }));
     try {
-      const text = generatedScript.slice(0, 300) || subject.trim() || "Hola, esta es una muestra de voz generada con inteligencia artificial.";
-      addLog("debug", `Texto a sintetizar (${text.length} chars): "${text.slice(0, 80)}…"`);
+      const text = generatedScript.slice(0, 300) || subject.trim() || t("voiceSample");
+      addLog("debug", t("logSynthText", { n: text.length, t: text.slice(0, 80) }));
       const res = await fetch("/api/mpt/v1/audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -355,14 +355,14 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
       }
       const data = await res.json();
       const taskId = data?.data?.task_id;
-      if (!taskId) throw new Error("El servidor no devolvió task_id");
-      addLog("info", `Tarea creada: ${taskId.slice(0, 8)}… — esperando TTS…`);
+      if (!taskId) throw new Error(t("logNoTaskId"));
+      addLog("info", t("logTaskWaitTts", { id: taskId.slice(0, 8) }));
 
       // Esperar a que termine el audio (poll cada 2s, hasta 60 intentos = 2 min)
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 2000));
         const r2 = await fetch(`/api/mpt/v1/tasks/${taskId}`);
-        if (!r2.ok) { addLog("warn", `Poll ${i+1}: respuesta ${r2.status}`); continue; }
+        if (!r2.ok) { addLog("warn", `Poll ${i+1}: ${r2.status}`); continue; }
         const d2 = await r2.json();
         const state = d2?.data?.state;
         const progress = d2?.data?.progress ?? 0;
@@ -370,29 +370,29 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
         if (state === 1) {
           // El backend guarda el audio en "audio_file", no en "videos"
           const rawPath: string = d2?.data?.audio_file ?? d2?.data?.videos?.[0] ?? "";
-          addLog("debug", `audio_file raw: ${rawPath || "(vacío)"}`);
+          addLog("debug", `audio_file raw: ${rawPath || "(-)"}`);
           if (rawPath) {
             const normalized = rawPath.replace(/\\/g, "/");
             const match = normalized.match(/([0-9a-f\-]{36}\/[^/]+)$/i);
             const streamPath = match ? match[1] : `${taskId}/audio.mp3`;
-            addLog("success", `Audio listo → /stream/${streamPath}`);
+            addLog("success", t("logAudioReady", { p: streamPath }));
             setPreviewUrl(`/api/mpt/v1/stream/${streamPath}`);
             // Borrar carpeta de audio del disco después de 30s
             setTimeout(() => {
               fetch(`/api/library?taskId=${taskId}`, { method: "DELETE" }).catch(() => {});
             }, 30000);
           } else {
-            throw new Error("Audio generado pero audio_file está vacío");
+            throw new Error(t("logAudioEmpty"));
           }
           break;
         }
         if (state === -1) {
-          const errMsg = d2?.data?.message || "Error al sintetizar voz";
+          const errMsg = d2?.data?.message || t("logTtsError");
           throw new Error(errMsg);
         }
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Error desconocido";
+      const msg = e instanceof Error ? e.message : t("unknownError");
       addLog("error", msg);
       setPreviewError(msg);
     } finally { setPreviewLoading(false); }
@@ -405,8 +405,8 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
     setLoading(true);
     setLogs([]);
     onLogsChange?.([]);
-    addLog("info", `Iniciando generación: "${subject.trim()}"`);
-    addLog("info", `Config: ${paragraphs} párrafo(s), ${aspect}, ${videoSource}, voz=${voice || "sin voz"}`);
+    addLog("info", t("logStarting", { s: subject.trim() }));
+    addLog("info", t("logConfig", { p: paragraphs, a: aspect, src: videoSource, v: voice || t("noVoiceSuffix") }));
     onStart();
     try {
       const res = await fetch("/api/mpt/v1/videos", {
@@ -454,16 +454,16 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
       }
       const data = await res.json();
       const taskId = data?.data?.task_id;
-      if (!taskId) throw new Error("No se recibió task_id del servidor");
+      if (!taskId) throw new Error(t("logNoTaskIdReceived"));
       await pollTask(taskId);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Error desconocido");
+      onError(err instanceof Error ? err.message : t("unknownError"));
     } finally { setLoading(false); }
   };
 
   const pollTask = async (taskId: string) => {
-    addLog("info", `Tarea creada: ${taskId.slice(0, 8)}… — monitoreando progreso…`);
-    addLog("debug", `FFmpeg puede tardar 5–15 min dependiendo de los párrafos y subtítulos`);
+    addLog("info", t("logTaskMonitor", { id: taskId.slice(0, 8) }));
+    addLog("debug", t("logFfmpegHint"));
     let lastProgress = -1;
     // 360 intentos × 5s = 30 minutos máximo
     for (let i = 0; i < 360; i++) {
@@ -477,29 +477,29 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
       if (progress !== lastProgress) {
         const elapsed = Math.round((i * 5) / 60);
         const msg = progress >= 75
-          ? `Progreso: ${progress}% — FFmpeg ensamblando video${elapsed > 0 ? ` (${elapsed} min transcurridos)` : ""}…`
-          : `Progreso: ${progress}%`;
+          ? t("logProgressFfmpeg", { p: progress, e: elapsed > 0 ? t("logElapsedMin", { n: elapsed }) : "" })
+          : t("logProgress", { p: progress });
         addLog("info", msg);
         lastProgress = progress;
       }
       // TASK_STATE_COMPLETE = 1
       if (state === 1) {
         const videos: string[] = taskData?.videos ?? [];
-        addLog("success", `¡Video listo! ${videos.length} archivo(s) generado(s)`);
+        addLog("success", t("logVideoReady", { n: videos.length }));
         onGenerated({ taskId, videos });
         return;
       }
       // TASK_STATE_FAILED = -1
       if (state === -1) {
-        const errMsg = taskData?.message || "La generación falló (state=-1)";
+        const errMsg = taskData?.message || t("logGenFailed");
         addLog("error", errMsg);
         throw new Error(errMsg);
       }
     }
-    throw new Error("Tiempo de espera agotado (30 min). El video puede haberse generado — revisa 'Mis videos'.");
+    throw new Error(t("timeout30"));
   };
 
-  const durationLabel = paragraphs <= 2 ? "~40–60 seg" : paragraphs <= 4 ? "~80–120 seg" : paragraphs <= 6 ? "~2–3 min" : "~3–5 min";
+  const durationLabel = paragraphs <= 2 ? t("dur1") : paragraphs <= 4 ? t("dur2") : paragraphs <= 6 ? t("dur3") : t("dur4");
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
   return (
@@ -509,34 +509,34 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
       <div style={{ textAlign: "center", paddingBottom: 12 }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 14px", borderRadius: 99, background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.2)", marginBottom: 16 }}>
           <Sparkles size={13} color="#a78bfa" />
-          <span style={{ fontSize: 13, color: "#a78bfa", fontWeight: 500 }}>IA Generativa de Video</span>
+          <span style={{ fontSize: 13, color: "#a78bfa", fontWeight: 500 }}>{t("heroBadge")}</span>
         </div>
         <h1 style={{ fontSize: 38, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: 10 }}>
-          <span className="gradient-text">Genera videos virales</span>
+          <span className="gradient-text">{t("heroTitle1")}</span>
           <br />
-          <span style={{ color: "#fff" }}>con inteligencia artificial</span>
+          <span style={{ color: "#fff" }}>{t("heroTitle2")}</span>
         </h1>
         <p style={{ color: "#71717a", fontSize: 15, maxWidth: 500, margin: "0 auto", lineHeight: 1.6 }}>
-          Escribe un tema y la IA generará el guión, descargará clips, añadirá voz y subtítulos automáticamente.
+          {t("heroSubtitle")}
         </p>
       </div>
 
       {/* ══════════════════════════════ GUIÓN ══════════════════════════════ */}
       <div style={CARD}>
-        <SectionToggle open={openScript} onToggle={() => setOpenScript(!openScript)} icon={Sparkles} title="Guión del video" />
+        <SectionToggle open={openScript} onToggle={() => setOpenScript(!openScript)} icon={Sparkles} title={t("scriptSection")} />
         {openScript && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-            <Field label="Tema del video *">
+            <Field label={t("subjectLabel")}>
               <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} required
-                placeholder="Ej: 3 señales de que tu abundancia está a punto de llegar"
+                placeholder={t("subjectPlaceholder")}
                 style={INPUT} />
             </Field>
 
             <Row2>
-              <Field label="Idioma del guión">
+              <Field label={t("scriptLang")}>
                 <select value={videoLanguage} onChange={(e) => setVideoLanguage(e.target.value)} style={SELECT}>
-                  <option value="">Auto detectar</option>
+                  <option value="">{t("autoDetect")}</option>
                   <option value="es-ES">Español</option>
                   <option value="en-US">English</option>
                   <option value="pt-BR">Português</option>
@@ -553,7 +553,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                   <option value="tr-TR">Türkçe</option>
                 </select>
               </Field>
-              <Field label={`Número de párrafos · ${durationLabel}`}>
+              <Field label={t("paragraphsLabelDur", { dur: durationLabel })}>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {[1,2,3,4,5,6,7,8].map((p) => (
                     <button key={p} type="button" onClick={() => setParagraphs(p)} style={{
@@ -566,21 +566,21 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
               </Field>
             </Row2>
 
-            <Field label="Instrucciones adicionales para el guión (opcional, máx. 2000 chars)">
+            <Field label={t("extraInstructionsMax")}>
               <textarea value={scriptPrompt} onChange={(e) => setScriptPrompt(e.target.value)}
-                placeholder="Ej: Usa tono motivacional, incluye 3 puntos con ejemplos reales..."
+                placeholder={t("scriptPromptPlaceholder")}
                 rows={2} maxLength={2000} style={{ ...INPUT, resize: "vertical" }} />
             </Field>
 
             {/* Custom system prompt */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <span style={{ fontSize: 13, color: "#a1a1aa" }}>Usar prompt de sistema personalizado</span>
+              <span style={{ fontSize: 13, color: "#a1a1aa" }}>{t("customSysToggle")}</span>
               <Toggle value={useCustomSys} onChange={setUseCustomSys} />
             </div>
             {useCustomSys && (
-              <Field label="Prompt del sistema (máx. 8000 chars)">
+              <Field label={t("sysPromptLabel")}>
                 <textarea value={customSysPrompt} onChange={(e) => setCustomSysPrompt(e.target.value)}
-                  placeholder="Prompt de sistema para la IA..."
+                  placeholder={t("sysPromptPlaceholder")}
                   rows={4} maxLength={8000} style={{ ...INPUT, resize: "vertical" }} />
               </Field>
             )}
@@ -594,7 +594,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                 {generatingScript
                   ? <RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} />
                   : <Wand2 size={14} />}
-                {generatingScript ? "Generando guión…" : "Generar guión con IA"}
+                {generatingScript ? t("generatingScript") : t("generateScript")}
               </button>
               <button type="button" onClick={handleGenerateTerms} disabled={!subject.trim() || generatingTerms}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10,
@@ -603,17 +603,17 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                 {generatingTerms
                   ? <RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} />
                   : <Sparkles size={14} />}
-                {generatingTerms ? "Generando…" : "Generar solo keywords"}
+                {generatingTerms ? t("generating") : t("generateKeywordsOnly")}
               </button>
             </div>
 
-            <Field label="Guión del video (editable — vacío = la IA lo genera al crear el video)">
+            <Field label={t("scriptEditable")}>
               <textarea value={generatedScript} onChange={(e) => setGeneratedScript(e.target.value)}
-                placeholder="El guión aparecerá aquí, o escribe el tuyo..."
+                placeholder={t("scriptPlaceholder")}
                 rows={7} style={{ ...INPUT, resize: "vertical" }} />
             </Field>
 
-            <Field label="Keywords / términos de búsqueda de clips (editable)">
+            <Field label={t("keywordsLabel")}>
               <input type="text" value={videoTerms} onChange={(e) => setVideoTerms(e.target.value)}
                 placeholder="nature, abundance, sunrise, meditation..."
                 style={INPUT} />
@@ -624,12 +624,12 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
 
       {/* ══════════════════════════════ VIDEO ══════════════════════════════ */}
       <div style={CARD}>
-        <SectionToggle open={openVideo} onToggle={() => setOpenVideo(!openVideo)} icon={Film} title="Configuración de video" color="#22d3ee" />
+        <SectionToggle open={openVideo} onToggle={() => setOpenVideo(!openVideo)} icon={Film} title={t("videoConfigSection")} color="#22d3ee" />
         {openVideo && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
             {/* Aspect ratio */}
-            <Field label="Formato (aspect ratio)">
+            <Field label={t("aspectLabel")}>
               <div style={{ display: "flex", gap: 10 }}>
                 {([
                   { ratio: "9:16", sub: "TikTok / Reels", w: 22, h: 38 },
@@ -654,19 +654,19 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
             </Field>
 
             <Row2>
-              <Field label="Fuente de clips">
+              <Field label={t("clipSource")}>
                 <select value={videoSource} onChange={(e) => {
                   setVideoSource(e.target.value);
                   if (e.target.value === "local") loadLocalMaterials();
                 }} style={SELECT}>
                   <option value="pexels" style={{ background: "#0d0d0d" }}>Pexels</option>
                   <option value="pixabay" style={{ background: "#0d0d0d" }}>Pixabay</option>
-                  <option value="local" style={{ background: "#0d0d0d" }}>Local (archivos propios)</option>
+                  <option value="local" style={{ background: "#0d0d0d" }}>{t("localOwn")}</option>
                 </select>
               </Field>
-              <Field label="Videos a generar simultáneamente">
+              <Field label={t("videosSimul")}>
                 <select value={videoCount} onChange={(e) => setVideoCount(Number(e.target.value))} style={SELECT}>
-                  {[1,2,3,4,5].map((n) => <option key={n} value={n} style={{ background: "#0d0d0d" }}>{n} video{n > 1 ? "s" : ""}</option>)}
+                  {[1,2,3,4,5].map((n) => <option key={n} value={n} style={{ background: "#0d0d0d" }}>{n} {n > 1 ? t("videosWord") : t("videoWord")}</option>)}
                 </select>
               </Field>
             </Row2>
@@ -676,13 +676,13 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
               <div style={{ padding: 18, borderRadius: 14, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.15)" }}>
                 {/* Info de requisitos */}
                 <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 10, background: "rgba(6,182,212,0.07)", border: "1px solid rgba(6,182,212,0.15)" }}>
-                  <p style={{ fontSize: 12, color: "#67e8f9", fontWeight: 600, marginBottom: 4 }}>Requisitos para videos locales</p>
+                  <p style={{ fontSize: 12, color: "#67e8f9", fontWeight: 600, marginBottom: 4 }}>{t("localReqTitle")}</p>
                   <ul style={{ fontSize: 11, color: "#71717a", lineHeight: 1.8, margin: 0, paddingLeft: 16 }}>
-                    <li>Formatos: <strong style={{ color: "#a1a1aa" }}>MP4, MOV, AVI, MKV, FLV</strong> (también JPG, PNG para imágenes)</li>
-                    <li>Resolución recomendada: <strong style={{ color: "#a1a1aa" }}>1920×1080 o superior</strong></li>
-                    <li>Duración por clip: <strong style={{ color: "#a1a1aa" }}>mínimo 3–5 segundos</strong></li>
-                    <li>Total de clips: suficiente para cubrir la duración del audio (~45s por párrafo)</li>
-                    <li>Sin audio obligatorio (el backend usa tu voz TTS)</li>
+                    <li>{t("localReq1")}</li>
+                    <li>{t("localReq2")}</li>
+                    <li>{t("localReq3")}</li>
+                    <li>{t("localReq4")}</li>
+                    <li>{t("localReq5")}</li>
                   </ul>
                 </div>
 
@@ -708,7 +708,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                     }}
                   >
                     {localUploading ? <RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} /> : <Plus size={14} />}
-                    {localUploading ? "Subiendo…" : "Subir videos"}
+                    {localUploading ? t("uploading") : t("uploadVideos")}
                   </button>
                   <button
                     type="button"
@@ -728,12 +728,12 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                 {/* Lista de materiales */}
                 {localMaterials.length === 0 ? (
                   <p style={{ fontSize: 13, color: "#52525b", textAlign: "center", padding: "16px 0" }}>
-                    {localLoading ? "Cargando…" : "No hay videos subidos. Sube al menos un clip."}
+                    {localLoading ? t("loadingDots") : t("noVideosUploaded")}
                   </p>
                 ) : (
                   <>
                     <p style={{ fontSize: 11, color: "#52525b", marginBottom: 8 }}>
-                      Selecciona los clips a usar ({selectedMaterials.length} seleccionados):
+                      {t("selectClips", { n: selectedMaterials.length })}
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto" }}>
                       {localMaterials.map((m) => {
@@ -774,12 +774,12 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                     <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                       <button type="button" onClick={() => setSelectedMaterials(localMaterials.map((m) => m.file))}
                         style={{ fontSize: 11, color: "#a78bfa", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                        Seleccionar todo
+                        {t("selectAll")}
                       </button>
                       <span style={{ color: "#3f3f46" }}>·</span>
                       <button type="button" onClick={() => setSelectedMaterials([])}
                         style={{ fontSize: 11, color: "#52525b", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                        Deseleccionar todo
+                        {t("deselectAll")}
                       </button>
                     </div>
                   </>
@@ -788,15 +788,15 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
             )}
 
             <Row2>
-              <Field label="Orden de clips">
+              <Field label={t("clipOrder")}>
                 <select value={concatMode} onChange={(e) => setConcatMode(e.target.value)} style={SELECT}>
-                  <option value="random" style={{ background: "#0d0d0d" }}>Aleatorio</option>
-                  <option value="sequential" style={{ background: "#0d0d0d" }}>Secuencial</option>
+                  <option value="random" style={{ background: "#0d0d0d" }}>{t("random")}</option>
+                  <option value="sequential" style={{ background: "#0d0d0d" }}>{t("sequential")}</option>
                 </select>
               </Field>
-              <Field label="Transición entre clips">
+              <Field label={t("transitionLabel")}>
                 <select value={transition} onChange={(e) => setTransition(e.target.value)} style={SELECT}>
-                  <option value="none" style={{ background: "#0d0d0d" }}>Sin transición</option>
+                  <option value="none" style={{ background: "#0d0d0d" }}>{t("noTransition")}</option>
                   <option value="Shuffle" style={{ background: "#0d0d0d" }}>Shuffle</option>
                   <option value="FadeIn" style={{ background: "#0d0d0d" }}>Fade In</option>
                   <option value="FadeOut" style={{ background: "#0d0d0d" }}>Fade Out</option>
@@ -807,13 +807,13 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
             </Row2>
 
             <Row2>
-              <Field label={`Duración de cada clip · ${clipDuration} seg`}>
+              <Field label={t("clipDurationLabel", { n: clipDuration })}>
                 <input type="range" min={2} max={10} step={1} value={clipDuration}
                   onChange={(e) => setClipDuration(Number(e.target.value))} />
               </Field>
-              <Field label="Codec de video">
+              <Field label={t("codecLabel")}>
                 <select value={codec} onChange={(e) => setCodec(e.target.value)} style={SELECT}>
-                  <option value="libx264" style={{ background: "#0d0d0d" }}>libx264 — CPU (universal)</option>
+                  <option value="libx264" style={{ background: "#0d0d0d" }}>{t("codecCpu")}</option>
                   <option value="h264_nvenc" style={{ background: "#0d0d0d" }}>h264_nvenc — NVIDIA</option>
                   <option value="h264_amf" style={{ background: "#0d0d0d" }}>h264_amf — AMD</option>
                   <option value="h264_qsv" style={{ background: "#0d0d0d" }}>h264_qsv — Intel QSV</option>
@@ -827,16 +827,16 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
 
       {/* ══════════════════════════════ AUDIO / VOZ ══════════════════════════════ */}
       <div style={CARD}>
-        <SectionToggle open={openAudio} onToggle={() => setOpenAudio(!openAudio)} icon={Mic} title="Voz y audio" color="#34d399" />
+        <SectionToggle open={openAudio} onToggle={() => setOpenAudio(!openAudio)} icon={Mic} title={t("voiceAudioSection")} color="#34d399" />
         {openAudio && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
             {/* Servidor TTS */}
-            <Field label="Servidor de síntesis de voz (TTS)">
+            <Field label={t("ttsServerLabel")}>
               <select value={ttsServer} onChange={(e) => handleTtsServerChange(e.target.value as TtsServer)} style={SELECT}>
-                <option value="no-voice" style={{ background: "#0d0d0d" }}>Sin voz</option>
-                <option value="azure-tts-v1" style={{ background: "#0d0d0d" }}>Azure TTS V1 (gratis, recomendado)</option>
-                <option value="azure-tts-v2" style={{ background: "#0d0d0d" }}>Azure TTS V2 (multilingüe, requiere API key)</option>
+                <option value="no-voice" style={{ background: "#0d0d0d" }}>{t("noVoice")}</option>
+                <option value="azure-tts-v1" style={{ background: "#0d0d0d" }}>{t("azureV1")}</option>
+                <option value="azure-tts-v2" style={{ background: "#0d0d0d" }}>{t("azureV2")}</option>
                 <option value="siliconflow" style={{ background: "#0d0d0d" }}>SiliconFlow TTS</option>
                 <option value="gemini-tts" style={{ background: "#0d0d0d" }}>Google Gemini TTS</option>
                 <option value="mimo-tts" style={{ background: "#0d0d0d" }}>Xiaomi MiMo TTS</option>
@@ -874,14 +874,14 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
               <>
                 {/* Filtro de idioma (solo para Azure V1 que tiene muchos) */}
                 {(ttsServer === "azure-tts-v1" || ttsServer === "azure-tts-v2") && langs.length > 1 && (
-                  <Field label="Filtrar voces por idioma">
+                  <Field label={t("filterVoicesByLang")}>
                     <select value={voiceLangFilter} onChange={(e) => handleLangChange(e.target.value)} style={SELECT}>
                       {langs.map((l) => <option key={l} value={l} style={{ background: "#0d0d0d" }}>{l}</option>)}
                     </select>
                   </Field>
                 )}
 
-                <Field label="Voz del narrador">
+                <Field label={t("narratorVoice")}>
                   <select value={voice} onChange={(e) => setVoice(e.target.value)} style={SELECT}>
                     {filteredVoices.map((v) => (
                       <option key={v.value} value={v.value} style={{ background: "#0d0d0d" }}>
@@ -902,7 +902,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                       {previewLoading
                         ? <RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} />
                         : <Play size={14} />}
-                      {previewLoading ? "Generando audio…" : "▶ Probar voz"}
+                      {previewLoading ? t("generatingAudio") : t("testVoice")}
                     </button>
                     {previewUrl && (
                       <audio ref={audioRef} src={previewUrl} controls autoPlay
@@ -920,14 +920,14 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
             )}
 
             <Row2>
-              <Field label={`Velocidad de voz · ${voiceRate.toFixed(1)}x`}>
+              <Field label={t("voiceRateLabel", { n: voiceRate.toFixed(1) })}>
                 <select value={voiceRate} onChange={(e) => setVoiceRate(Number(e.target.value))} style={SELECT}>
                   {[0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.8, 2.0].map((r) => (
                     <option key={r} value={r} style={{ background: "#0d0d0d" }}>{r}x</option>
                   ))}
                 </select>
               </Field>
-              <Field label={`Volumen de voz · ${voiceVolume}x`}>
+              <Field label={t("voiceVolumeLabel", { n: voiceVolume })}>
                 <select value={voiceVolume} onChange={(e) => setVoiceVolume(Number(e.target.value))} style={SELECT}>
                   {[0.6, 0.8, 1.0, 1.2, 1.5, 2.0, 3.0, 4.0, 5.0].map((v) => (
                     <option key={v} value={v} style={{ background: "#0d0d0d" }}>{v}x</option>
@@ -937,14 +937,14 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
             </Row2>
 
             <Row2>
-              <Field label="Música de fondo">
+              <Field label={t("bgmLabel")}>
                 <select value={bgmType} onChange={(e) => setBgmType(e.target.value)} style={SELECT}>
-                  <option value="" style={{ background: "#0d0d0d" }}>Sin música</option>
-                  <option value="random" style={{ background: "#0d0d0d" }}>Aleatoria</option>
-                  <option value="custom" style={{ background: "#0d0d0d" }}>Personalizada</option>
+                  <option value="" style={{ background: "#0d0d0d" }}>{t("noMusic")}</option>
+                  <option value="random" style={{ background: "#0d0d0d" }}>{t("randomMusic")}</option>
+                  <option value="custom" style={{ background: "#0d0d0d" }}>{t("customMusic")}</option>
                 </select>
               </Field>
-              <Field label={`Volumen BGM · ${Math.round(bgmVolume * 100)}%`}>
+              <Field label={t("bgmVolumeLabel", { n: Math.round(bgmVolume * 100) })}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Music size={13} color="#52525b" style={{ flexShrink: 0 }} />
                   <input type="range" min={0} max={1} step={0.05} value={bgmVolume}
@@ -960,67 +960,67 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
       <div style={CARD}>
         <SectionToggle
           open={openSubs} onToggle={() => setOpenSubs(!openSubs)}
-          icon={Type} title="Subtítulos" color="#f59e0b"
+          icon={Type} title={t("subtitlesSection")} color="#f59e0b"
           badge={
             <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, marginLeft: 4,
               background: subtitles ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)",
               color: subtitles ? "#34d399" : "#52525b" }}>
-              {subtitles ? "Activados" : "Desactivados"}
+              {subtitles ? t("enabledBadge") : t("disabledBadge")}
             </span>
           }
         />
         {openSubs && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <span style={{ fontSize: 13, color: "#a1a1aa" }}>Activar subtítulos automáticos</span>
+              <span style={{ fontSize: 13, color: "#a1a1aa" }}>{t("enableSubtitles")}</span>
               <Toggle value={subtitles} onChange={setSubtitles} />
             </div>
 
             {subtitles && (
               <>
                 <Row2>
-                  <Field label="Fuente">
+                  <Field label={t("fontLabel")}>
                     <select value={fontName} onChange={(e) => setFontName(e.target.value)} style={SELECT}>
                       {FONTS.map((f) => <option key={f} value={f} style={{ background: "#0d0d0d" }}>{f}</option>)}
                     </select>
                   </Field>
-                  <Field label="Posición">
+                  <Field label={t("positionLabel")}>
                     <select value={subtitlePos} onChange={(e) => setSubtitlePos(e.target.value)} style={SELECT}>
-                      <option value="top" style={{ background: "#0d0d0d" }}>Arriba</option>
-                      <option value="center" style={{ background: "#0d0d0d" }}>Centro</option>
-                      <option value="bottom" style={{ background: "#0d0d0d" }}>Abajo</option>
-                      <option value="custom" style={{ background: "#0d0d0d" }}>Personalizada</option>
+                      <option value="top" style={{ background: "#0d0d0d" }}>{t("posTop")}</option>
+                      <option value="center" style={{ background: "#0d0d0d" }}>{t("posCenter")}</option>
+                      <option value="bottom" style={{ background: "#0d0d0d" }}>{t("posBottom")}</option>
+                      <option value="custom" style={{ background: "#0d0d0d" }}>{t("posCustom")}</option>
                     </select>
                   </Field>
                 </Row2>
 
                 {subtitlePos === "custom" && (
-                  <Field label={`Posición personalizada · ${customPos}% desde arriba`}>
+                  <Field label={t("customPositionLabel", { n: customPos })}>
                     <input type="range" min={0} max={100} step={1} value={customPos}
                       onChange={(e) => setCustomPos(Number(e.target.value))} />
                   </Field>
                 )}
 
                 <Row2>
-                  <Field label={`Tamaño de fuente · ${fontSize}px`}>
+                  <Field label={t("fontSizeLabel", { n: fontSize })}>
                     <input type="range" min={30} max={100} step={2} value={fontSize}
                       onChange={(e) => setFontSize(Number(e.target.value))} />
                   </Field>
-                  <Field label={`Grosor del contorno · ${strokeWidth}`}>
+                  <Field label={t("strokeWidthLabel", { n: strokeWidth })}>
                     <input type="range" min={0} max={10} step={0.5} value={strokeWidth}
                       onChange={(e) => setStrokeWidth(parseFloat(e.target.value))} />
                   </Field>
                 </Row2>
 
                 <Row2>
-                  <Field label="Color del texto">
+                  <Field label={t("textColorLabel")}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)}
                         style={{ width: 40, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "none", cursor: "pointer", padding: 2 }} />
                       <code style={{ fontSize: 13, color: "#71717a" }}>{textColor}</code>
                     </div>
                   </Field>
-                  <Field label="Color del contorno">
+                  <Field label={t("strokeColorLabel")}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <input type="color" value={strokeColor} onChange={(e) => setStrokeColor(e.target.value)}
                         style={{ width: 40, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "none", cursor: "pointer", padding: 2 }} />
@@ -1032,7 +1032,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                 {/* Fondo del subtítulo */}
                 <div style={{ padding: "14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 13, color: "#a1a1aa" }}>Fondo del subtítulo</span>
+                    <span style={{ fontSize: 13, color: "#a1a1aa" }}>{t("subtitleBgLabel")}</span>
                     <Toggle value={subtitleBg} onChange={setSubtitleBg} />
                   </div>
                   {subtitleBg && (
@@ -1044,7 +1044,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <Toggle value={roundedBg} onChange={setRoundedBg} />
-                        <span style={{ fontSize: 13, color: "#71717a" }}>Esquinas redondeadas</span>
+                        <span style={{ fontSize: 13, color: "#71717a" }}>{t("roundedCorners")}</span>
                       </div>
                     </div>
                   )}
@@ -1057,12 +1057,12 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
 
       {/* ══════════════════════════════ CONFIGURACIÓN / API KEYS ══════════════════════════════ */}
       <div style={CARD}>
-        <SectionToggle open={openConfig} onToggle={() => setOpenConfig(!openConfig)} icon={Key} title="Configuración y API Keys" color="#fb923c" />
+        <SectionToggle open={openConfig} onToggle={() => setOpenConfig(!openConfig)} icon={Key} title={t("configSection")} color="#fb923c" />
         {openConfig && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ padding: "12px 16px", borderRadius: 12, background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.2)" }}>
               <p style={{ fontSize: 13, color: "#fdba74", lineHeight: 1.6 }}>
-                Las API keys de Pexels, Pixabay y el proveedor LLM se configuran editando el archivo{" "}
+                {t("apiKeysInfo")}{" "}
                 <code style={{ background: "rgba(255,255,255,0.08)", padding: "1px 6px", borderRadius: 4, fontSize: 12, color: "#e4e4e7" }}>
                   MoneyPrinterTurbo/config.toml
                 </code>
@@ -1071,14 +1071,14 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
 
             {/* Pexels keys */}
             <div>
-              <label style={LABEL}>Agregar nueva API key de Pexels</label>
+              <label style={LABEL}>{t("addPexelsKey")}</label>
               <div style={{ display: "flex", gap: 8 }}>
                 <input type="text" value={pexelsNewKey} onChange={(e) => setPexelsNewKey(e.target.value)}
-                  placeholder="Pega aquí la nueva key de Pexels..."
+                  placeholder={t("pastePexels")}
                   style={{ ...INPUT, flex: 1 }} />
                 <button type="button" disabled={!pexelsNewKey.trim()}
                   onClick={() => {
-                    alert(`Para agregar la key, añádela manualmente en config.toml en pexels_api_keys.\nKey: ${pexelsNewKey}`);
+                    alert(t("alertAddKey", { field: "pexels_api_keys", key: pexelsNewKey }));
                     setPexelsNewKey("");
                   }}
                   style={{ padding: "0 16px", borderRadius: 10, border: "none", background: "rgba(139,92,246,0.2)", color: "#a78bfa", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap" }}>
@@ -1089,14 +1089,14 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
 
             {/* Pixabay keys */}
             <div>
-              <label style={LABEL}>Agregar nueva API key de Pixabay</label>
+              <label style={LABEL}>{t("addPixabayKey")}</label>
               <div style={{ display: "flex", gap: 8 }}>
                 <input type="text" value={pixabayNewKey} onChange={(e) => setPixabayNewKey(e.target.value)}
-                  placeholder="Pega aquí la nueva key de Pixabay..."
+                  placeholder={t("pastePixabay")}
                   style={{ ...INPUT, flex: 1 }} />
                 <button type="button" disabled={!pixabayNewKey.trim()}
                   onClick={() => {
-                    alert(`Para agregar la key, añádela manualmente en config.toml en pixabay_api_keys.\nKey: ${pixabayNewKey}`);
+                    alert(t("alertAddKey", { field: "pixabay_api_keys", key: pixabayNewKey }));
                     setPixabayNewKey("");
                   }}
                   style={{ padding: "0 16px", borderRadius: 10, border: "none", background: "rgba(139,92,246,0.2)", color: "#a78bfa", fontWeight: 600, fontSize: 14 }}>
@@ -1111,7 +1111,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
       {/* ══════════════════════════════ LOGS VISUALES ══════════════════════════════ */}
       {logs.length > 0 && (
         <div style={{ marginBottom: 4 }}>
-          <LogPanel logs={logs} title="Actividad" maxHeight={200} />
+          <LogPanel logs={logs} title={t("activity")} maxHeight={200} />
         </div>
       )}
 
@@ -1127,11 +1127,11 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
           transition: "all 0.25s",
         }}>
           <Wand2 size={20} />
-          {loading ? "Generando video…" : `Crear video · ${durationLabel}`}
+          {loading ? t("creatingVideo") : t("createVideoDur", { dur: durationLabel })}
         </button>
         <p style={{ textAlign: "center", fontSize: 12, color: "#3f3f46", marginTop: 8 }}>
-          {videoCount > 1 ? `${videoCount} videos` : "1 video"} · {paragraphs} párrafo{paragraphs > 1 ? "s" : ""} · {aspect} · {videoSource}
-          {ttsServer !== "no-voice" ? ` · ${voice.split("-").slice(0,3).join("-")}` : " · sin voz"}
+          {videoCount > 1 ? `${videoCount} ${t("videosWord")}` : `1 ${t("videoWord")}`} · {paragraphs} {paragraphs > 1 ? t("paragraphsWord") : t("paragraphWord")} · {aspect} · {videoSource}
+          {ttsServer !== "no-voice" ? ` · ${voice.split("-").slice(0,3).join("-")}` : ` · ${t("noVoiceSuffix")}`}
         </p>
       </div>
 

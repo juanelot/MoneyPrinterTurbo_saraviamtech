@@ -3,23 +3,16 @@
 import { useEffect, useState } from "react";
 import { FileText, Mic, Download, Film, Sparkles } from "lucide-react";
 import LogPanel, { type LogEntry } from "@/components/LogPanel";
+import { useT, type TKey } from "@/lib/i18n";
 
-const STEPS = [
-  { icon: FileText, label: "Generando guión con IA", detail: "ChatGPT escribe el guión del video", ms: 8000 },
-  { icon: Mic, label: "Sintetizando voz y audio", detail: "Azure TTS genera la narración", ms: 10000 },
-  { icon: Download, label: "Descargando clips de video", detail: "Buscando clips en Pexels / Pixabay", ms: 20000 },
-  { icon: Film, label: "Ensamblando el video final", detail: "FFmpeg combina todo en un archivo", ms: 180000 },
+const STEP_DEFS: { icon: React.ElementType; label: TKey; detail: TKey; ms: number }[] = [
+  { icon: FileText, label: "step1Label", detail: "step1Detail", ms: 8000 },
+  { icon: Mic, label: "step2Label", detail: "step2Detail", ms: 10000 },
+  { icon: Download, label: "step3Label", detail: "step3Detail", ms: 20000 },
+  { icon: Film, label: "step4Label", detail: "step4Detail", ms: 180000 },
 ];
 
-const TIPS = [
-  "El primer video puede tardar más porque descarga los clips de Pexels desde cero.",
-  "Los clips descargados se guardan en caché — los siguientes videos son más rápidos.",
-  "Puedes generar videos en español, inglés, portugués, alemán y más idiomas.",
-  "Cambia el número de párrafos para controlar la duración del video.",
-  "La voz se genera gratis con Azure TTS Edge sin límites de uso.",
-  "FFmpeg puede tardar 5–15 minutos quemando subtítulos — es normal, no cierres la ventana.",
-  "Si el video llega a 75% y se queda ahí, FFmpeg está trabajando. Puede tardar hasta 15 min.",
-];
+const TIP_KEYS: TKey[] = ["tip1", "tip2", "tip3", "tip4", "tip5", "tip6", "tip7"];
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
@@ -32,9 +25,10 @@ interface Props {
 }
 
 export default function GenerationProgress({ logs = [] }: Props) {
+  const { t } = useT();
   const [elapsed, setElapsed] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
-  const [tipIndex] = useState(Math.floor(Math.random() * TIPS.length));
+  const [tipIndex] = useState(Math.floor(Math.random() * TIP_KEYS.length));
   const [ffmpegWarning, setFfmpegWarning] = useState(false);
 
   useEffect(() => {
@@ -44,16 +38,16 @@ export default function GenerationProgress({ logs = [] }: Props) {
 
   useEffect(() => {
     let acc = 0;
-    for (let i = 0; i < STEPS.length - 1; i++) {
-      acc += STEPS[i].ms;
+    for (let i = 0; i < STEP_DEFS.length - 1; i++) {
+      acc += STEP_DEFS[i].ms;
       if (elapsed * 1000 < acc) { setCurrentStep(i); return; }
     }
-    setCurrentStep(STEPS.length - 1);
+    setCurrentStep(STEP_DEFS.length - 1);
   }, [elapsed]);
 
   // Mostrar aviso FFmpeg si lleva más de 3 min en el paso final
   useEffect(() => {
-    if (currentStep === STEPS.length - 1 && elapsed > 180) {
+    if (currentStep === STEP_DEFS.length - 1 && elapsed > 180) {
       setFfmpegWarning(true);
     }
   }, [currentStep, elapsed]);
@@ -64,12 +58,12 @@ export default function GenerationProgress({ logs = [] }: Props) {
     if (!last) return;
     const msg = last.msg.toLowerCase();
     if (msg.includes("guión") || msg.includes("script")) setCurrentStep(0);
-    else if (msg.includes("audio") || msg.includes("voz") || msg.includes("tts")) setCurrentStep(1);
-    else if (msg.includes("clip") || msg.includes("material") || msg.includes("pexels")) setCurrentStep(2);
-    else if (msg.includes("ensambland") || msg.includes("ffmpeg") || msg.includes("final")) setCurrentStep(3);
+    else if (msg.includes("audio") || msg.includes("voz") || msg.includes("voice") || msg.includes("tts")) setCurrentStep(1);
+    else if (msg.includes("clip") || msg.includes("material") || msg.includes("pexels") || msg.includes("imágenes") || msg.includes("images")) setCurrentStep(2);
+    else if (msg.includes("ensambland") || msg.includes("assembl") || msg.includes("ffmpeg") || msg.includes("final")) setCurrentStep(3);
   }, [logs]);
 
-  const progress = Math.min(((currentStep + 0.5) / STEPS.length) * 100, 96);
+  const progress = Math.min(((currentStep + 0.5) / STEP_DEFS.length) * 100, 96);
 
   return (
     <div style={{ maxWidth: 620, margin: "60px auto 0" }} className="fade-in-up">
@@ -92,15 +86,15 @@ export default function GenerationProgress({ logs = [] }: Props) {
       </div>
 
       <h2 style={{ fontSize: 28, fontWeight: 800, color: "#ffffff", marginBottom: 8, letterSpacing: "-0.02em", textAlign: "center" }}>
-        Generando tu video
+        {t("generatingYourVideo")}
       </h2>
       <p style={{ fontSize: 14, color: "#52525b", marginBottom: 32, textAlign: "center" }}>
-        Tiempo transcurrido: <span style={{ color: "#a78bfa", fontWeight: 600 }}>{formatTime(elapsed)}</span>
+        {t("elapsedTime")} <span style={{ color: "#a78bfa", fontWeight: 600 }}>{formatTime(elapsed)}</span>
       </p>
 
       {/* Pasos */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-        {STEPS.map((step, i) => {
+        {STEP_DEFS.map((step, i) => {
           const Icon = step.icon;
           const isActive = i === currentStep;
           const isDone = i < currentStep;
@@ -130,10 +124,10 @@ export default function GenerationProgress({ logs = [] }: Props) {
 
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: isActive ? "#ffffff" : isDone ? "#34d399" : "#52525b" }}>
-                  {step.label}
+                  {t(step.label)}
                 </div>
                 <div style={{ fontSize: 12, color: isActive ? "#71717a" : isDone ? "#065f46" : "#3f3f46", marginTop: 2 }}>
-                  {step.detail}
+                  {t(step.detail)}
                 </div>
               </div>
 
@@ -167,7 +161,7 @@ export default function GenerationProgress({ logs = [] }: Props) {
         </div>
       </div>
       <p style={{ fontSize: 13, color: "#52525b", marginBottom: 24, textAlign: "center" }}>
-        {Math.round(progress)}% completado
+        {t("pctComplete", { n: Math.round(progress) })}
       </p>
 
       {/* Aviso FFmpeg lento */}
@@ -180,12 +174,10 @@ export default function GenerationProgress({ logs = [] }: Props) {
           <span style={{ fontSize: 18, flexShrink: 0 }}>⏳</span>
           <div>
             <p style={{ fontSize: 13, fontWeight: 600, color: "#fbbf24", marginBottom: 4 }}>
-              FFmpeg está ensamblando — esto es normal
+              {t("ffmpegTitle")}
             </p>
             <p style={{ fontSize: 12, color: "#78716c", lineHeight: 1.6 }}>
-              Quemar subtítulos en 1080×1920 puede tardar <strong style={{ color: "#a8a29e" }}>5–15 minutos</strong> dependiendo
-              de la duración del video. <strong style={{ color: "#a8a29e" }}>No cierres esta ventana.</strong>{" "}
-              Si se agota el tiempo, el video igual quedará en <em>Mis videos</em>.
+              {t("ffmpegBody")}
             </p>
           </div>
         </div>
@@ -193,14 +185,14 @@ export default function GenerationProgress({ logs = [] }: Props) {
 
       {/* Panel de logs en tiempo real */}
       <div style={{ marginBottom: 20 }}>
-        <LogPanel logs={logs} title="Log en tiempo real" maxHeight={220} />
+        <LogPanel logs={logs} title={t("liveLog")} maxHeight={220} />
       </div>
 
       {/* Tip */}
       <div style={{ padding: "14px 18px", borderRadius: 14, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.15)" }}>
         <p style={{ fontSize: 13, color: "#71717a", lineHeight: 1.6 }}>
-          <span style={{ color: "#a78bfa", fontWeight: 600 }}>Tip: </span>
-          {TIPS[tipIndex]}
+          <span style={{ color: "#a78bfa", fontWeight: 600 }}>{t("tipLabel")}</span>
+          {t(TIP_KEYS[tipIndex])}
         </p>
       </div>
     </div>

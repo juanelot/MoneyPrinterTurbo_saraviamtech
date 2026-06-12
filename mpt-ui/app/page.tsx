@@ -9,6 +9,7 @@ import GenerationProgress from "@/components/GenerationProgress";
 import VideoResult from "@/components/VideoResult";
 import VideoLibrary from "@/components/VideoLibrary";
 import { type LogEntry } from "@/components/LogPanel";
+import { useT } from "@/lib/i18n";
 
 export type GenerationStatus = "idle" | "generating" | "done" | "error";
 
@@ -20,6 +21,7 @@ export interface TaskResult {
 type Tab = "create" | "zenn" | "library";
 
 export default function Home() {
+  const { t } = useT();
   const [tab, setTab] = useState<Tab>("create");
   const [status, setStatus] = useState<GenerationStatus>("idle");
   const [taskResult, setTaskResult] = useState<TaskResult | null>(null);
@@ -80,15 +82,15 @@ export default function Home() {
           }}>
             <button style={TAB_BTN(tab === "create")} onClick={() => setTab("create")}>
               <Wand2 size={15} />
-              Crear video
+              {t("tabCreate")}
             </button>
             <button style={TAB_BTN(tab === "zenn")} onClick={() => setTab("zenn")}>
               <ImageIcon size={15} />
-              Video de imágenes
+              {t("tabZenn")}
             </button>
             <button style={TAB_BTN(tab === "library")} onClick={() => setTab("library")}>
               <Film size={15} />
-              Mis videos
+              {t("tabLibrary")}
             </button>
           </div>
         </div>
@@ -152,8 +154,8 @@ export default function Home() {
                     justifyContent: "center", fontSize: 22, color: "#f87171",
                   }}>✕</div>
                   <div style={{ textAlign: "center" }}>
-                    <p style={{ color: "#f87171", fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Error al generar el video</p>
-                    <p style={{ color: "#71717a", fontSize: 14, lineHeight: 1.6 }}>{errorMsg || "Ocurrió un error inesperado"}</p>
+                    <p style={{ color: "#f87171", fontWeight: 600, fontSize: 16, marginBottom: 6 }}>{t("errorGenerating")}</p>
+                    <p style={{ color: "#71717a", fontSize: 14, lineHeight: 1.6 }}>{errorMsg || t("unexpectedError")}</p>
                   </div>
                   {logs.length > 0 && (
                     <div style={{ width: "100%", marginTop: 4 }}>
@@ -179,14 +181,14 @@ export default function Home() {
                       background: "rgba(239,68,68,0.12)", color: "#f87171",
                       fontSize: 14, fontWeight: 600, cursor: "pointer",
                     }}>
-                      Intentar de nuevo
+                      {t("tryAgain")}
                     </button>
                     <button onClick={() => { setTab("library"); handleReset(); }} style={{
                       padding: "10px 24px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)",
                       background: "rgba(255,255,255,0.05)", color: "#a1a1aa",
                       fontSize: 14, fontWeight: 600, cursor: "pointer",
                     }}>
-                      Ver mis videos
+                      {t("viewMyVideos")}
                     </button>
                   </div>
                 </div>

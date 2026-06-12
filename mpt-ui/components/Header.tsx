@@ -1,4 +1,29 @@
+"use client";
+
 import { Video, Sparkles } from "lucide-react";
+import { useT, type Lang } from "@/lib/i18n";
+
+function LangToggle() {
+  const { lang, setLang } = useT();
+  const BTN = (active: boolean): React.CSSProperties => ({
+    padding: "4px 10px", borderRadius: 7, border: "none", cursor: "pointer",
+    background: active ? "rgba(139,92,246,0.2)" : "transparent",
+    color: active ? "#a78bfa" : "#52525b",
+    fontSize: 12, fontWeight: 700, transition: "all 0.2s",
+  });
+  return (
+    <div style={{
+      display: "inline-flex", gap: 2, padding: 2, borderRadius: 9,
+      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+    }}>
+      {(["es", "en"] as Lang[]).map((l) => (
+        <button key={l} type="button" onClick={() => setLang(l)} style={BTN(lang === l)}>
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function Header() {
   return (
@@ -33,9 +58,12 @@ export default function Header() {
         </div>
 
         {/* Right */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#71717a", fontSize: 13 }}>
-          <Sparkles size={13} color="#a78bfa" />
-          <span>Powered by GPT-4o mini + Pexels</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#71717a", fontSize: 13 }}>
+            <Sparkles size={13} color="#a78bfa" />
+            <span>Powered by GPT-4o mini + Pexels</span>
+          </div>
+          <LangToggle />
         </div>
       </div>
     </header>
