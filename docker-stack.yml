@@ -1,0 +1,63 @@
+version: "3.7"
+
+# Stack de producción para Docker Swarm + Traefik (Portainer).
+# Las imágenes se construyen en el VPS antes de desplegar — ver DEPLOY.md:
+#   docker build -t mpt-api:latest ./MoneyPrinterTurbo
+#   docker build -t mpt-ui:latest --build-arg MPT_API_URL=http://api:8080 ./mpt-ui
+
+services:
+  api:
+    image: mpt-api:latest
+    command: ["python3", "main.py"]
+    networks:
+      - contabo
+    volumes:
+      - /root/mpt-data/config.toml:/MoneyPrinterTurbo/config.toml
+      - /root/mpt-data/storage:/MoneyPrinterTurbo/storage
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "3"
+          memory: 4G
+
+  ui:
+    image: mpt-ui:latest
+    networks:
+      - contabo
+    environment:
+      - NODE_ENV=production
+      - MPT_API_URL=http://api:8080
+      - MPT_STORAGE_DIR=/MoneyPrinterTurbo/storage
+    volumes:
+      - /root/mpt-data/storage:/MoneyPrinterTurbo/storage
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.virales.rule=Host(`virales.saraviamtech.com`)
+        - traefik.http.routers.virales.entrypoints=websecure
+        - traefik.http.routers.virales.tls.certresolver=letsencryptresolver
+        - traefik.http.services.virales.loadbalancer.server.port=3000
+        - traefik.http.services.virales.loadbalancer.passHostHeader=1
+        # Auth básica para que nadie más gaste tus créditos (Kie/OpenAI).
+        # Generar el hash en el VPS:  htpasswd -nb admin TU_PASSWORD
+        # (escapar cada $ como $$ al pegarlo aquí)
+        - traefik.http.routers.virales.middlewares=virales-auth
+        - traefik.http.middlewares.virales-auth.basicauth.users=admin:$$apr1$$REEMPLAZA$$CON_TU_HASH
+
+networks:
+  contabo:
+    external: true

@@ -135,7 +135,8 @@ export async function DELETE(req: NextRequest) {
   try {
     // 1. Tell the Python backend to release the task (frees file handles on Windows)
     try {
-      await fetch(`http://localhost:8080/api/v1/tasks/${taskId}`, { method: "DELETE" });
+      const apiUrl = process.env.MPT_API_URL || "http://localhost:8080";
+      await fetch(`${apiUrl}/api/v1/tasks/${taskId}`, { method: "DELETE" });
     } catch { /* backend may be offline — continue anyway */ }
 
     // 2. Small delay to let Windows release file locks
