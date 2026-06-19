@@ -23,3 +23,6 @@ MoneyPrinterTurbo/config.toml
 .DS_Store
 Thumbs.db
 desktop.ini
+__pycache__/
+videos_generados/
+perfil_zenn.json

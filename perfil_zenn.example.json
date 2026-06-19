@@ -1,0 +1,37 @@
+{
+  "modo": "kie",
+
+  "idioma": "es-ES",
+  "parrafos": 30,
+  "instrucciones": "Tono enérgico y narrativo, estilo canal de curiosidades.",
+
+  "aspect": "9:16",
+  "codec": "libx264",
+  "tematica": "",
+  "estilo": "The image must look like an extremely simple beginner drawing made in MS Paint. It should look like someone who is not good at drawing created it quickly by hand. Plain white background, thick crude lines, flat colors, no shading, no 3D, not cinematic, not realistic, no text, no watermark.",
+  "min_dur": 2.5,
+  "max_images": 207,
+
+  "fuente_clips": "pexels",
+  "terminos": "",
+  "concat": "random",
+  "transicion": "",
+  "dur_clip": 5,
+
+  "voz": "es-VE-SebastianNeural-Male",
+  "voz_velocidad": 1.0,
+  "voz_volumen": 1.0,
+  "sin_voz": false,
+  "musica": "random",
+  "musica_volumen": 0.2,
+
+  "sin_subtitulos": false,
+  "sub_posicion": "bottom",
+  "fuente": "MicrosoftYaHeiBold.ttc",
+  "tam_fuente": 60,
+  "color_texto": "#FFFFFF",
+  "color_contorno": "#000000",
+  "grosor_contorno": 1.5,
+
+  "timeout": 7200
+}

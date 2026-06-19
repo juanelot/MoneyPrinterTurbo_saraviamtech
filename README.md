@@ -143,6 +143,86 @@ Si quieres usar tus propios clips:
 
 ---
 
+## CLI de automatización (`zenn_cli.py`)
+
+Script de línea de comandos para generar videos **sin abrir el navegador**, ideal para
+automatización, cron o que lo dispare otro agente/app (ej. **Hermes**, n8n). Usa el mismo
+REST del backend, así que el resultado es idéntico al de la web. **Cubre las 3 formas de generar:**
+
+| Modo | Qué hace |
+|---|---|
+| `--modo kie` (default) | Video estilo Zenn con imágenes generadas por IA (Kie AI) |
+| `--modo local` | Video estilo Zenn con TUS imágenes (sube una carpeta, orden alfabético) |
+| `--modo video` | Video clásico con clips de Pexels / Pixabay / locales |
+
+### Requisitos
+
+```bash
+pip install requests        # única dependencia del CLI
+```
+
+### Configuración por entorno
+
+```bash
+# URL base de la API (default: el VPS público)
+export MPT_API_BASE="https://virales.saraviamtech.com/api/mpt/v1"
+# o local:  export MPT_API_BASE="http://localhost:8080/api/v1"
+
+# Solo si activaste auth básica en Traefik
+export MPT_BASIC_AUTH="usuario:password"
+```
+
+### Ejemplos
+
+```bash
+# 1) Kie AI con un guion propio y tope de imágenes (recomendado fijar max-images)
+python zenn_cli.py --tema "Mundial 2026" --guion guion.txt --max-images 207 --out ./videos
+
+# 2) Con un perfil guardado (voz, subtítulos, estilo, etc.) — ver perfil_zenn.example.json
+python zenn_cli.py --perfil perfil_zenn.json --tema "Mundial 2026" --guion guion.txt
+
+# 3) Imágenes locales: sube y ordena alfabéticamente la carpeta
+python zenn_cli.py --modo local --tema "Mi video" --guion guion.txt --imagenes-dir ./mis_imagenes
+
+# 4) Video clásico con clips de Pexels
+python zenn_cli.py --modo video --tema "Datos del espacio" --fuente-clips pexels --terminos "space,stars"
+
+# 5) Por lotes: un tema por línea, el backend genera cada guion
+python zenn_cli.py --perfil perfil_zenn.json --lote temas.txt --parrafos 30 --out ./videos
+```
+
+### Perfil de configuración
+
+Guarda tu combinación favorita (voz, subtítulos, estilo, etc.) en un JSON y reutilízala con
+`--perfil`. Cualquier flag CLI **sobreescribe** lo que venga en el perfil. Plantilla completa
+en [`perfil_zenn.example.json`](perfil_zenn.example.json). Cópiala a `perfil_zenn.json` y edítala.
+
+### Controles disponibles (1:1 con la web)
+
+`--voz`, `--voz-velocidad`, `--voz-volumen`, `--sin-voz`, `--musica`, `--musica-volumen`,
+`--sin-subtitulos`, `--sub-posicion`, `--fuente`, `--tam-fuente`, `--color-texto`,
+`--color-contorno`, `--grosor-contorno`, `--aspect`, `--codec`, `--tematica`, `--estilo`,
+`--min-dur`, `--max-images`, `--idioma`, `--parrafos`, `--instrucciones`, `--capitulos`,
+`--timeout`. Modo video además: `--fuente-clips`, `--terminos`, `--concat`, `--transicion`, `--dur-clip`.
+
+Ver todo con `python zenn_cli.py --help`.
+
+### Integración con Hermes (u otro agente)
+
+El CLI imprime el progreso por stdout y termina con código `0` (éxito) o `1` (error), así que
+cualquier orquestador lo invoca como un comando normal:
+
+1. Prepara un `perfil_zenn.json` con tu configuración base.
+2. Que Hermes ejecute el comando, p. ej.:
+   `python zenn_cli.py --perfil perfil_zenn.json --tema "{{tema}}" --max-images 207 --out /ruta/salida`
+3. El MP4 final queda en la carpeta `--out` con nombre `tema-slug-<taskid>.mp4`.
+4. Para varios videos de una vez, usa `--lote temas.txt` (un tema por línea).
+
+> El `--timeout` por defecto es 2 h (no se corta como el navegador a los 40 min). Si generas
+> muchas imágenes con Kie, el render puede tardar bastante; el CLI espera hasta que termina.
+
+---
+
 ## Variables de configuración importantes
 
 | Parámetro | Descripción |
