@@ -272,6 +272,15 @@ def payload_video(cfg: dict, tema: str, guion: str | None) -> dict:
 
 def generar_uno(cfg, api_base, out_dir, tema, guion, con_capitulos, imagenes_dir):
     modo = cfg["modo"]
+    # Seguro anti-gasto: el modo kie consume créditos reales de Kie AI por
+    # imagen. Exigir un tope explícito evita que una automatización (agente,
+    # cron) lance una generación sin límite por accidente.
+    if modo == "kie" and cfg["max_images"] <= 0:
+        raise RuntimeError(
+            "El modo kie gasta créditos de Kie AI por cada imagen. "
+            "Debes indicar un tope explícito con --max-images N "
+            "(o max_images en el perfil). Ejemplo: --max-images 50"
+        )
     print(f"\n▶ [{modo}] Generando: {tema}", flush=True)
 
     if modo == "video":
