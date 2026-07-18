@@ -158,7 +158,9 @@ def subir_imagenes(api_base: str, carpeta: str) -> list:
 
 def esperar_tarea(api_base: str, task_id: str, timeout: int, intervalo: int = 5) -> dict:
     deadline = time.time() + timeout
+    inicio = time.time()
     last_progress = -1
+    last_heartbeat = time.time()
     while time.time() < deadline:
         time.sleep(intervalo)
         r = requests.get(f"{api_base}/tasks/{task_id}", auth=_auth(), timeout=60)
@@ -171,6 +173,18 @@ def esperar_tarea(api_base: str, task_id: str, timeout: int, intervalo: int = 5)
         if progress != last_progress:
             print(f"  · {progress}%", flush=True)
             last_progress = progress
+            last_heartbeat = time.time()
+        elif time.time() - last_heartbeat >= 120:
+            # El render FFmpeg puede quedarse en el mismo % durante 30-40 min
+            # sin que eso signifique que la tarea murió. Este latido evita que
+            # un orquestador (agente IA, cron) crea que se colgó y la mate.
+            mins = int((time.time() - inicio) / 60)
+            print(
+                f"  · sigue en {progress}% tras {mins} min — renderizando, "
+                f"es normal hasta ~40 min en CPU. NO cancelar.",
+                flush=True,
+            )
+            last_heartbeat = time.time()
         if state == 1:
             return data
         if state == -1:
