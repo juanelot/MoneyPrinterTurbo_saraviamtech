@@ -199,11 +199,19 @@ def descargar(api_base: str, task_id: str, file_path: str, out_dir: Path, nombre
 
 def _subs(cfg: dict) -> dict:
     """Bloque común de voz/audio/subtítulos para cualquier modo."""
+    # --musica acepta: "" (sin música), "random", o un nombre de MP3 subido
+    # al servidor (música personalizada, se resuelve en resource/songs).
+    musica = cfg["musica"]
+    if musica and musica.lower().endswith(".mp3"):
+        bgm_type, bgm_file = "custom", musica
+    else:
+        bgm_type, bgm_file = musica, ""
     return {
         "voice_name": None if cfg["sin_voz"] else cfg["voz"],
         "voice_volume": cfg["voz_volumen"],
         "voice_rate": cfg["voz_velocidad"],
-        "bgm_type": cfg["musica"],
+        "bgm_type": bgm_type,
+        "bgm_file": bgm_file,
         "bgm_volume": cfg["musica_volumen"],
         "subtitle_enabled": not cfg["sin_subtitulos"],
         "subtitle_position": cfg["sub_posicion"],
@@ -353,7 +361,7 @@ def main():
     p.add_argument("--voz-velocidad", dest="voz_velocidad", type=float, help="Velocidad de voz (1.0 = normal).")
     p.add_argument("--voz-volumen", dest="voz_volumen", type=float, help="Volumen de voz.")
     p.add_argument("--sin-voz", dest="sin_voz", action="store_true", default=None, help="Sin narración.")
-    p.add_argument("--musica", help="'random' o '' (sin música).")
+    p.add_argument("--musica", help="'random', '' (sin música), o nombre de un MP3 subido al servidor (ej. micancion.mp3).")
     p.add_argument("--musica-volumen", dest="musica_volumen", type=float, help="Volumen música de fondo (0-1).")
 
     # Subtítulos
