@@ -224,7 +224,9 @@ en [`perfil_zenn.example.json`](perfil_zenn.example.json). Cópiala a `perfil_ze
 
 `--voz`, `--voz-velocidad`, `--voz-volumen`, `--sin-voz`, `--musica` (`random`, `""` sin música,
 o el nombre de un MP3 subido al servidor, ej. `micancion.mp3`), `--musica-volumen`,
-`--sin-subtitulos`, `--sub-posicion`, `--fuente`, `--tam-fuente`, `--color-texto`,
+`--sin-subtitulos`, `--sub-posicion` (`top|center|bottom|custom`), `--sub-posicion-pct`
+(0-100, con `custom`), `--sub-fondo` / `--sub-sin-fondo` (caja/sombra detrás del texto),
+`--sub-fondo-redondeado`, `--fuente`, `--tam-fuente`, `--color-texto`,
 `--color-contorno`, `--grosor-contorno`, `--aspect`, `--codec`, `--tematica`, `--estilo`,
 `--min-dur`, `--max-images`, `--idioma`, `--parrafos`, `--instrucciones`, `--capitulos`,
 `--timeout`. Modo video además: `--fuente-clips`, `--terminos`, `--concat`, `--transicion`, `--dur-clip`.
