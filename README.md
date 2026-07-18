@@ -165,11 +165,18 @@ Script de línea de comandos para generar videos **sin abrir el navegador**, ide
 automatización, cron o que lo dispare otro agente/app (ej. **Hermes**, n8n). Usa el mismo
 REST del backend, así que el resultado es idéntico al de la web. **Cubre las 3 formas de generar:**
 
-| Modo | Qué hace |
-|---|---|
-| `--modo kie` (default) | Video estilo Zenn con imágenes generadas por IA (Kie AI) |
-| `--modo local` | Video estilo Zenn con TUS imágenes (sube una carpeta, orden alfabético) |
-| `--modo video` | Video clásico con clips de Pexels / Pixabay / locales |
+| Modo | Qué hace | Costo |
+|---|---|---|
+| `--modo kie` (default) | Video estilo Zenn con imágenes generadas por IA (Kie AI) | 💰 **Gasta créditos de Kie por imagen** |
+| `--modo local` | Video estilo Zenn con TUS imágenes (sube una carpeta, orden alfabético) | Gratis |
+| `--modo video` | Video clásico con clips de Pexels / Pixabay / locales | Gratis |
+
+> ⚠️ **El modo `kie` exige `--max-images N` obligatorio** (o `max_images` en el
+> perfil): sin tope explícito el CLI se niega a ejecutar y falla con error, sin
+> tocar la API. Es un seguro para que una automatización (agente IA, cron, n8n)
+> no lance por accidente una generación sin límite que queme créditos. Si
+> integras el CLI con un agente, dale la regla de nunca usar modo kie sin
+> confirmación humana del tope.
 
 ### Requisitos
 
@@ -215,7 +222,8 @@ en [`perfil_zenn.example.json`](perfil_zenn.example.json). Cópiala a `perfil_ze
 
 ### Controles disponibles (1:1 con la web)
 
-`--voz`, `--voz-velocidad`, `--voz-volumen`, `--sin-voz`, `--musica`, `--musica-volumen`,
+`--voz`, `--voz-velocidad`, `--voz-volumen`, `--sin-voz`, `--musica` (`random`, `""` sin música,
+o el nombre de un MP3 subido al servidor, ej. `micancion.mp3`), `--musica-volumen`,
 `--sin-subtitulos`, `--sub-posicion`, `--fuente`, `--tam-fuente`, `--color-texto`,
 `--color-contorno`, `--grosor-contorno`, `--aspect`, `--codec`, `--tematica`, `--estilo`,
 `--min-dur`, `--max-images`, `--idioma`, `--parrafos`, `--instrucciones`, `--capitulos`,
