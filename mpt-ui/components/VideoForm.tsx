@@ -4,7 +4,7 @@ import { useState, useRef, useMemo } from "react";
 import {
   Wand2, ChevronDown, ChevronUp, Mic, Music, Type,
   Sparkles, Film, RefreshCw,
-  Play, Key, Plus,
+  Play, Key, Plus, Pause,
 } from "lucide-react";
 import type { TaskResult } from "@/app/page";
 import {
@@ -187,6 +187,22 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
   const [songUploading, setSongUploading]   = useState(false);
   const [songUploadMsg, setSongUploadMsg]   = useState("");
   const songFileRef = useRef<HTMLInputElement>(null);
+  const [playingSong, setPlayingSong]       = useState("");
+  const songAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlaySong = (file: string) => {
+    if (playingSong === file) {
+      songAudioRef.current?.pause();
+      setPlayingSong("");
+      return;
+    }
+    songAudioRef.current?.pause();
+    const audio = new Audio(`/api/mpt/v1/musics/${encodeURIComponent(file)}`);
+    songAudioRef.current = audio;
+    audio.onended = () => setPlayingSong("");
+    audio.play().catch(() => setPlayingSong(""));
+    setPlayingSong(file);
+  };
 
   const loadSongs = async () => {
     setSongsLoading(true);
@@ -1056,7 +1072,20 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                             borderRadius: 8, cursor: "pointer", textAlign: "left",
                           }}
                         >
-                          <Music size={13} color={selected ? "#c4b5fd" : "#52525b"} style={{ flexShrink: 0 }} />
+                          <span
+                            role="button"
+                            title="Play / Pause"
+                            onClick={(e) => { e.stopPropagation(); togglePlaySong(s.file); }}
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                              background: playingSong === s.file ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.05)",
+                            }}
+                          >
+                            {playingSong === s.file
+                              ? <Pause size={12} color="#c4b5fd" />
+                              : <Play size={12} color={selected ? "#c4b5fd" : "#71717a"} />}
+                          </span>
                           <span style={{ fontSize: 12.5, color: selected ? "#e4e4e7" : "#a1a1aa", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {s.name}
                           </span>

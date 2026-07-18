@@ -334,6 +334,29 @@ def upload_video_material_file(request: Request, file: UploadFile = File(...)):
         "", status_code=400, message=f"{request_id}: Only files with extensions {', '.join(allowed_suffixes)} can be uploaded"
     )
 
+
+@router.get("/musics/{file_name}", summary="Stream a BGM file for preview")
+def stream_bgm_file(request: Request, file_name: str):
+    request_id = base.get_task_id(request)
+    song_dir = utils.song_dir()
+    # 与 bgm_file 参数一致：只允许读取 songs 白名单目录内的 mp3，防止路径逃逸。
+    try:
+        song_path = file_security.resolve_path_within_directory(song_dir, file_name)
+    except ValueError:
+        raise HttpException(
+            "", status_code=400, message=f"{request_id}: invalid music file name"
+        )
+    if not song_path.lower().endswith(".mp3") or not os.path.isfile(song_path):
+        raise HttpException(
+            "", status_code=404, message=f"{request_id}: music file not found"
+        )
+    return FileResponse(
+        path=song_path,
+        media_type="audio/mpeg",
+        filename=os.path.basename(song_path),
+    )
+
+
 @router.get("/stream/{file_path:path}")
 async def stream_video(request: Request, file_path: str):
     request_id = base.get_task_id(request)
