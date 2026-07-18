@@ -27,6 +27,9 @@
 
   "sin_subtitulos": false,
   "sub_posicion": "bottom",
+  "sub_posicion_pct": 70.0,
+  "sub_fondo": false,
+  "sub_fondo_redondeado": false,
   "fuente": "MicrosoftYaHeiBold.ttc",
   "tam_fuente": 60,
   "color_texto": "#FFFFFF",

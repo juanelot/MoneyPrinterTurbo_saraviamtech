@@ -91,6 +91,9 @@ DEFAULTS = {
     # subtítulos
     "sin_subtitulos": False,
     "sub_posicion": "bottom",
+    "sub_posicion_pct": 70.0,   # solo aplica con sub_posicion = custom (0=arriba, 100=abajo)
+    "sub_fondo": False,          # caja/sombra de fondo detrás del texto
+    "sub_fondo_redondeado": False,
     "fuente": "MicrosoftYaHeiBold.ttc",
     "tam_fuente": 60,
     "color_texto": "#FFFFFF",
@@ -229,6 +232,9 @@ def _subs(cfg: dict) -> dict:
         "bgm_volume": cfg["musica_volumen"],
         "subtitle_enabled": not cfg["sin_subtitulos"],
         "subtitle_position": cfg["sub_posicion"],
+        "custom_position": cfg["sub_posicion_pct"],
+        "text_background_color": cfg["sub_fondo"],
+        "rounded_subtitle_background": cfg["sub_fondo_redondeado"],
         "font_name": cfg["fuente"],
         "font_size": cfg["tam_fuente"],
         "text_fore_color": cfg["color_texto"],
@@ -389,7 +395,15 @@ def main():
 
     # Subtítulos
     p.add_argument("--sin-subtitulos", dest="sin_subtitulos", action="store_true", default=None, help="Desactivar subtítulos.")
-    p.add_argument("--sub-posicion", dest="sub_posicion", choices=["top", "center", "bottom"], help="Posición de subtítulos.")
+    p.add_argument("--sub-posicion", dest="sub_posicion", choices=["top", "center", "bottom", "custom"], help="Posición de subtítulos.")
+    p.add_argument("--sub-posicion-pct", dest="sub_posicion_pct", type=float,
+                   help="Posición vertical en %% con --sub-posicion custom (0=arriba, 100=abajo; ej. 80).")
+    p.add_argument("--sub-fondo", dest="sub_fondo", action="store_true", default=None,
+                   help="Activar caja/sombra de fondo detrás de los subtítulos.")
+    p.add_argument("--sub-sin-fondo", dest="sub_fondo", action="store_false", default=None,
+                   help="Desactivar la caja/sombra de fondo de los subtítulos.")
+    p.add_argument("--sub-fondo-redondeado", dest="sub_fondo_redondeado", action="store_true", default=None,
+                   help="Esquinas redondeadas en la caja de fondo (requiere --sub-fondo).")
     p.add_argument("--fuente", help="Fuente de subtítulos (ej. MicrosoftYaHeiBold.ttc).")
     p.add_argument("--tam-fuente", dest="tam_fuente", type=int, help="Tamaño de fuente (px).")
     p.add_argument("--color-texto", dest="color_texto", help="Color del texto (#RRGGBB).")
