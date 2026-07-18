@@ -138,8 +138,24 @@ npm run dev
 
 Si quieres usar tus propios clips:
 - Selecciona "Local (archivos propios)" como fuente
-- Sube tus videos (MP4, MOV, AVI, MKV — mínimo 1920×1080, clips de 3s+)
-- Selecciona cuáles usar y genera
+- Sube videos (MP4, MOV, AVI, FLV, MKV) o imágenes (JPG, PNG)
+- **Resolución mínima: lado corto ≥ 400px** (clips verticales de IA tipo 464×832 sirven).
+  Los que no cumplan se descartan con un aviso en los logs.
+- Las imágenes se convierten a clips con efecto zoom (~30-60s de procesado por
+  imagen — sube solo las necesarias: con clips de 4s, ~15 imágenes ≈ 1 min de video)
+- Si un archivo aparece como "skip unreadable local material", está corrupto o es
+  una imagen renombrada como .mp4 — re-exportarlo
+
+### Música de fondo personalizada
+
+En "Música de fondo" hay 3 opciones: **Sin música**, **Aleatoria** (MP3s incluidos
+en `resource/songs`) y **Personalizada**:
+- Al elegir "Personalizada" aparece el botón **Subir música** (MP3) y la lista de
+  canciones subidas — haz clic en una para seleccionarla
+- Sin canción seleccionada el video sale **sin** música
+- Disponible tanto en "Crear video" como en el modo Zenn; las canciones subidas
+  se comparten entre ambos
+- En el VPS las canciones persisten en `/root/mpt-data/songs` (ver [DEPLOY.md](DEPLOY.md))
 
 ---
 
@@ -220,6 +236,16 @@ cualquier orquestador lo invoca como un comando normal:
 
 > El `--timeout` por defecto es 2 h (no se corta como el navegador a los 40 min). Si generas
 > muchas imágenes con Kie, el render puede tardar bastante; el CLI espera hasta que termina.
+
+---
+
+## Despliegue en producción (VPS)
+
+Guía completa en **[DEPLOY.md](DEPLOY.md)** (Portainer + Traefik + Docker Swarm).
+Resumen: datos persistentes en `/root/mpt-data/` (`config.toml`, `storage/`,
+`songs/`), imágenes construidas en el VPS, auth básica en Traefik. Para actualizar:
+`git pull` + rebuild + `docker service update --force`; si cambió `docker-stack.yml`,
+re-desplegar el stack.
 
 ---
 
