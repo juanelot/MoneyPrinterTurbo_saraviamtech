@@ -5,9 +5,16 @@ URL final: **https://virales.saraviamtech.com**
 ## 1. Preparar datos en el VPS (una sola vez)
 
 ```bash
-mkdir -p /root/mpt-data/storage
+mkdir -p /root/mpt-data/storage /root/mpt-data/songs
 # Subir tu config.toml REAL (con las API keys) — NO está en el repo:
 # scp MoneyPrinterTurbo/config.toml root@VPS:/root/mpt-data/config.toml
+```
+
+La carpeta `/root/mpt-data/songs` se monta sobre `resource/songs` y OCULTA
+los MP3 por defecto de la imagen. Copiarlos una sola vez tras clonar el repo:
+
+```bash
+cp MoneyPrinterTurbo_saraviamtech/MoneyPrinterTurbo/resource/songs/*.mp3 /root/mpt-data/songs/
 ```
 
 En `/root/mpt-data/config.toml` verifica:

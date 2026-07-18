@@ -178,6 +178,44 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
   const [voiceRate, setVoiceRate]           = useState(1.0);
   const [bgmType, setBgmType]               = useState("random");
   const [bgmVolume, setBgmVolume]           = useState(0.2);
+
+  // ── Música propia (BGM custom) ─────────────────────────────────────────────
+  interface SongFile { name: string; size: number; file: string; }
+  const [songs, setSongs]                   = useState<SongFile[]>([]);
+  const [bgmFile, setBgmFile]               = useState("");
+  const [songsLoading, setSongsLoading]     = useState(false);
+  const [songUploading, setSongUploading]   = useState(false);
+  const [songUploadMsg, setSongUploadMsg]   = useState("");
+  const songFileRef = useRef<HTMLInputElement>(null);
+
+  const loadSongs = async () => {
+    setSongsLoading(true);
+    try {
+      const res = await fetch("/api/mpt/v1/musics");
+      const data = await res.json();
+      setSongs(data?.data?.files ?? []);
+    } catch { /* ignore */ } finally { setSongsLoading(false); }
+  };
+
+  const handleSongUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setSongUploading(true);
+    setSongUploadMsg("");
+    let uploaded = 0;
+    for (const file of Array.from(files)) {
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const res = await fetch("/api/mpt/v1/musics", { method: "POST", body: form });
+        if (res.ok) uploaded++;
+      } catch { /* skip */ }
+    }
+    setSongUploadMsg(t("filesUploaded", { n: uploaded }));
+    await loadSongs();
+    setSongUploading(false);
+    if (songFileRef.current) songFileRef.current.value = "";
+  };
   // TTS extra keys
   const [azureRegion, setAzureRegion]       = useState("");
   const [azureKey, setAzureKey]             = useState("");
@@ -434,6 +472,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
           voice_volume: voiceVolume,
           voice_rate: voiceRate,
           bgm_type: bgmType,
+          bgm_file: bgmType === "custom" && bgmFile ? bgmFile : undefined,
           bgm_volume: bgmVolume,
           subtitle_enabled: subtitles,
           subtitle_position: subtitlePos,
@@ -938,7 +977,10 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
 
             <Row2>
               <Field label={t("bgmLabel")}>
-                <select value={bgmType} onChange={(e) => setBgmType(e.target.value)} style={SELECT}>
+                <select value={bgmType} onChange={(e) => {
+                  setBgmType(e.target.value);
+                  if (e.target.value === "custom") loadSongs();
+                }} style={SELECT}>
                   <option value="" style={{ background: "#0d0d0d" }}>{t("noMusic")}</option>
                   <option value="random" style={{ background: "#0d0d0d" }}>{t("randomMusic")}</option>
                   <option value="custom" style={{ background: "#0d0d0d" }}>{t("customMusic")}</option>
@@ -952,6 +994,85 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                 </div>
               </Field>
             </Row2>
+
+            {/* ── Música propia ── */}
+            {bgmType === "custom" && (
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <input
+                    ref={songFileRef}
+                    type="file"
+                    accept=".mp3"
+                    multiple
+                    onChange={handleSongUpload}
+                    style={{ display: "none" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => songFileRef.current?.click()}
+                    disabled={songUploading}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
+                      background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.35)",
+                      borderRadius: 8, color: "#c4b5fd", fontSize: 12.5, fontWeight: 600,
+                      cursor: songUploading ? "wait" : "pointer",
+                    }}
+                  >
+                    {songUploading ? <RefreshCw size={14} style={{ animation: "spin-slow 1s linear infinite" }} /> : <Plus size={14} />}
+                    {songUploading ? t("uploading") : t("uploadMusic")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={loadSongs}
+                    disabled={songsLoading}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6, padding: "7px 12px",
+                      background: "transparent", border: "1px solid #27272a",
+                      borderRadius: 8, color: "#a1a1aa", fontSize: 12.5, cursor: "pointer",
+                    }}
+                  >
+                    <RefreshCw size={13} style={songsLoading ? { animation: "spin-slow 1s linear infinite" } : {}} />
+                  </button>
+                  {songUploadMsg && <span style={{ fontSize: 12, color: "#34d399" }}>{songUploadMsg}</span>}
+                </div>
+
+                {songs.length === 0 ? (
+                  <p style={{ fontSize: 12.5, color: "#71717a" }}>
+                    {songsLoading ? t("loadingDots") : t("noSongsUploaded")}
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
+                    {songs.map((s) => {
+                      const selected = bgmFile === s.file;
+                      return (
+                        <button
+                          key={s.file}
+                          type="button"
+                          onClick={() => setBgmFile(selected ? "" : s.file)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+                            background: selected ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)",
+                            border: `1px solid ${selected ? "rgba(139,92,246,0.5)" : "#1f1f23"}`,
+                            borderRadius: 8, cursor: "pointer", textAlign: "left",
+                          }}
+                        >
+                          <Music size={13} color={selected ? "#c4b5fd" : "#52525b"} style={{ flexShrink: 0 }} />
+                          <span style={{ fontSize: 12.5, color: selected ? "#e4e4e7" : "#a1a1aa", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {s.name}
+                          </span>
+                          <span style={{ fontSize: 11, color: "#52525b", flexShrink: 0 }}>
+                            {(s.size / 1024 / 1024).toFixed(1)} MB
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {songs.length > 0 && !bgmFile && (
+                  <p style={{ fontSize: 11.5, color: "#f59e0b" }}>{t("selectSongHint")}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

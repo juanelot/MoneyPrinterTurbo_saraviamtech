@@ -101,6 +101,9 @@ export const en: Record<keyof typeof es, string> = {
   randomMusic: "Random",
   customMusic: "Custom",
   bgmVolumeLabel: "BGM volume · {n}%",
+  uploadMusic: "Upload music",
+  noSongsUploaded: "No songs uploaded yet. Upload at least one MP3.",
+  selectSongHint: "Select a song — with no selection the video will have no music.",
 
   // ── Subtitles ──
   subtitlesSection: "Subtitles",

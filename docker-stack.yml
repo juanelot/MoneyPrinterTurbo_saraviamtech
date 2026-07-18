@@ -14,6 +14,10 @@ services:
     volumes:
       - /root/mpt-data/config.toml:/MoneyPrinterTurbo/config.toml
       - /root/mpt-data/storage:/MoneyPrinterTurbo/storage
+      # BGM persistente (música subida por el usuario). OJO: al montar esta
+      # carpeta se ocultan los MP3 por defecto de la imagen — copiar antes
+      # los del repo una sola vez (ver DEPLOY.md).
+      - /root/mpt-data/songs:/MoneyPrinterTurbo/resource/songs
     deploy:
       mode: replicated
       replicas: 1

@@ -101,6 +101,9 @@ export const es = {
   randomMusic: "Aleatoria",
   customMusic: "Personalizada",
   bgmVolumeLabel: "Volumen BGM · {n}%",
+  uploadMusic: "Subir música",
+  noSongsUploaded: "No hay canciones subidas. Sube al menos un MP3.",
+  selectSongHint: "Selecciona una canción — sin selección el video saldrá sin música.",
 
   // ── Subtítulos ──
   subtitlesSection: "Subtítulos",
