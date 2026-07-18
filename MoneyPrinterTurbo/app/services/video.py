@@ -1018,9 +1018,10 @@ def preprocess_video(materials: List[MaterialInfo], clip_duration=4):
             continue
 
         ext = utils.parse_extension(material_source_path)
+        is_image = ext in const.FILE_TYPE_IMAGES
         try:
             # 图片素材直接按图片方式读取，避免先走 VideoFileClip 误判后触发不稳定的回退分支。
-            if ext in const.FILE_TYPE_IMAGES:
+            if is_image:
                 clip, material_source_path = _open_image_clip_with_fallback(
                     material_source_path
                 )
@@ -1032,6 +1033,9 @@ def preprocess_video(materials: List[MaterialInfo], clip_duration=4):
                 clip, material_source_path = _open_image_clip_with_fallback(
                     material_source_path
                 )
+                # 回退成功说明素材实际是图片（例如误命名为 .mp4 的 PNG），
+                # 后续必须走图片流程，否则会把静态图当视频丢给 ffmpeg。
+                is_image = True
             except Exception as exc:
                 logger.warning(
                     f"skip unreadable local material: {material.url}, error: {str(exc)}"
@@ -1040,13 +1044,14 @@ def preprocess_video(materials: List[MaterialInfo], clip_duration=4):
         try:
             width = clip.size[0]
             height = clip.size[1]
-            if width < 480 or height < 480:
-                logger.warning(f"low resolution material: {width}x{height}, minimum 480x480 required")
+            # 竖屏 AI 生成素材常见 464x832 这类分辨率，只要求短边达标即可。
+            if min(width, height) < 400:
+                logger.warning(f"low resolution material: {width}x{height}, minimum short side 400px required")
                 # 探测到低分辨率素材后立即关闭资源，并且不要把该素材返回给后续流程。
                 close_clip(clip)
                 continue
 
-            if ext in const.FILE_TYPE_IMAGES:
+            if is_image:
                 logger.info(f"processing image: {material_source_path}")
                 # 探测尺寸时已经打开过一次素材，这里先释放探测句柄，再重新创建用于导出的图片 clip。
                 close_clip(clip)
