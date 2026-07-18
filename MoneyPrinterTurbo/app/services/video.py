@@ -1079,6 +1079,9 @@ def preprocess_video(materials: List[MaterialInfo], clip_duration=4):
             else:
                 # 普通视频素材只需要读取尺寸做校验，校验完成后立即释放句柄即可。
                 close_clip(clip)
+                # 前端只传文件名；必须回写解析后的绝对路径，否则 combine_videos
+                # 会按进程 CWD 打开相对路径而找不到文件。
+                material.url = material_source_path
         except Exception:
             close_clip(clip)
             raise
