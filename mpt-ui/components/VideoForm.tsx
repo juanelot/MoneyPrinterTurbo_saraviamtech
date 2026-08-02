@@ -4,7 +4,7 @@ import { useState, useRef, useMemo } from "react";
 import {
   Wand2, ChevronDown, ChevronUp, Mic, Music, Type,
   Sparkles, Film, RefreshCw,
-  Play, Key, Plus, Pause,
+  Play, Key, Plus, Pause, Trash2,
 } from "lucide-react";
 import type { TaskResult } from "@/app/page";
 import {
@@ -133,6 +133,9 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
   const [localLoading, setLocalLoading]             = useState(false);
   const [localUploading, setLocalUploading]         = useState(false);
   const [localUploadMsg, setLocalUploadMsg]         = useState("");
+  const [localUploadMsgError, setLocalUploadMsgError] = useState(false);
+  const [clearingVideos, setClearingVideos]         = useState(false);
+  const [confirmClearVideos, setConfirmClearVideos] = useState(false);
   const localFileRef = useRef<HTMLInputElement>(null);
 
   const loadLocalMaterials = async () => {
@@ -149,6 +152,7 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
     if (!files || files.length === 0) return;
     setLocalUploading(true);
     setLocalUploadMsg("");
+    setLocalUploadMsgError(false);
     let uploaded = 0;
     for (const file of Array.from(files)) {
       const form = new FormData();
@@ -162,6 +166,43 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
     await loadLocalMaterials();
     setLocalUploading(false);
     if (localFileRef.current) localFileRef.current.value = "";
+  };
+
+  // Borra TODOS los videos locales del disco (las imágenes de esa carpeta
+  // pertenecen al flujo Zenn y no se tocan).
+  const handleClearAllVideos = async () => {
+    if (!confirmClearVideos) { setConfirmClearVideos(true); return; }
+    setClearingVideos(true);
+    setLocalUploadMsg("");
+    setLocalUploadMsgError(false);
+    try {
+      const res = await fetch("/api/local-videos?action=clear-all", { method: "DELETE" });
+      const data = await res.json();
+      setLocalUploadMsg(t("videosDeleted", { n: data?.deleted ?? 0 }));
+      setSelectedMaterials([]);
+      await loadLocalMaterials();
+    } catch {
+      setLocalUploadMsg(t("errorDeletingVideos"));
+      setLocalUploadMsgError(true);
+    } finally {
+      setClearingVideos(false);
+      setConfirmClearVideos(false);
+    }
+  };
+
+  // Borra un único archivo local.
+  const handleDeleteMaterial = async (filename: string) => {
+    setLocalUploadMsg("");
+    setLocalUploadMsgError(false);
+    try {
+      const res = await fetch(`/api/local-videos?file=${encodeURIComponent(filename)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("delete failed");
+      setSelectedMaterials((prev) => prev.filter((f) => f !== filename));
+      await loadLocalMaterials();
+    } catch {
+      setLocalUploadMsg(t("errorDeletingVideos"));
+      setLocalUploadMsgError(true);
+    }
   };
 
   const toggleMaterial = (filename: string) => {
@@ -484,7 +525,9 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
           paragraph_number: paragraphs,
           video_script_prompt: scriptPrompt || undefined,
           custom_system_prompt: useCustomSys ? customSysPrompt : undefined,
-          voice_name: ttsServer !== "no-voice" ? voice : undefined,
+          // El backend necesita el sentinel explícito "no-voice" para generar
+          // audio silencioso; si se envía vacío intenta TTS y la tarea falla.
+          voice_name: ttsServer !== "no-voice" ? voice : "no-voice",
           voice_volume: voiceVolume,
           voice_rate: voiceRate,
           bgm_type: bgmType,
@@ -777,7 +820,29 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                   >
                     <RefreshCw size={13} style={localLoading ? { animation: "spin-slow 1s linear infinite" } : {}} />
                   </button>
-                  {localUploadMsg && <span style={{ fontSize: 12, color: "#34d399" }}>{localUploadMsg}</span>}
+
+                  {/* Botón borrar todos los videos locales */}
+                  {localMaterials.length > 0 && (
+                    <>
+                      <button type="button" onClick={handleClearAllVideos} disabled={clearingVideos}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 10,
+                          border: `1px solid ${confirmClearVideos ? "rgba(239,68,68,0.4)" : "rgba(239,68,68,0.2)"}`,
+                          background: confirmClearVideos ? "rgba(239,68,68,0.15)" : "rgba(239,68,68,0.06)",
+                          color: confirmClearVideos ? "#f87171" : "#ef4444",
+                          fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>
+                        {clearingVideos
+                          ? <><RefreshCw size={13} style={{ animation: "spin-slow 1s linear infinite" }} /> {t("clearing")}</>
+                          : <><Trash2 size={13} /> {confirmClearVideos ? t("confirmClearAll") : t("clean")}</>}
+                      </button>
+                      {confirmClearVideos && !clearingVideos && (
+                        <button type="button" onClick={() => setConfirmClearVideos(false)}
+                          style={{ fontSize: 12, color: "#52525b", background: "none", border: "none", cursor: "pointer" }}>
+                          {t("cancel")}
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {localUploadMsg && <span style={{ fontSize: 12, color: localUploadMsgError ? "#f87171" : "#34d399" }}>{localUploadMsg}</span>}
                 </div>
 
                 {/* Lista de materiales */}
@@ -819,9 +884,20 @@ export default function VideoForm({ onStart, onGenerated, onError, onLogsChange 
                                 {m.name}
                               </span>
                             </div>
-                            <span style={{ fontSize: 11, color: "#52525b", flexShrink: 0, marginLeft: 8 }}>
-                              {sizeMb} MB
-                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                              <span style={{ fontSize: 11, color: "#52525b" }}>
+                                {sizeMb} MB
+                              </span>
+                              {/* Solo videos: las imágenes se borran desde la pestaña Zenn */}
+                              {/\.(mp4|mov|avi|flv|mkv)$/i.test(m.file) && (
+                                <button type="button" title={t("deleteVideo")}
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(m.file); }}
+                                  style={{ display: "flex", alignItems: "center", background: "none",
+                                    border: "none", color: "#52525b", cursor: "pointer", padding: 2 }}>
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
