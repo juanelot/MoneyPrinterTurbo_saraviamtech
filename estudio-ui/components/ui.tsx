@@ -92,3 +92,15 @@ export function AvisoError({ texto }: { texto: string | null | undefined }) {
   if (!texto) return null;
   return <p className="whitespace-pre-wrap rounded-xl bg-error-suave p-3 text-sm text-error">{texto}</p>;
 }
+
+// Boton de las tarjetas de video (Mis videos, Fabrica): icono y, en pantallas anchas, texto.
+export function Accion({ icono, texto, onClick, href, disabled, soloIcono, peligro, derecha }: {
+  icono: React.ReactNode; texto: string; onClick?: () => void; href?: string;
+  disabled?: boolean; soloIcono?: boolean; peligro?: boolean; derecha?: boolean;
+}) {
+  const clase = `boton boton-fantasma !gap-1.5 !px-2 !py-1.5 text-xs ${peligro ? "hover:!text-error" : ""} ${derecha ? "ml-auto" : ""}`;
+  const contenido = <>{icono}{!soloIcono && <span className="hidden sm:inline">{texto}</span>}</>;
+  if (disabled) return <span className={`${clase} pointer-events-none opacity-35`} title={texto}>{contenido}</span>;
+  if (href) return <a href={href} className={clase} title={texto}>{contenido}</a>;
+  return <button onClick={onClick} className={clase} title={texto}>{contenido}</button>;
+}

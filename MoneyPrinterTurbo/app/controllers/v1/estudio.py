@@ -20,7 +20,8 @@ from app.services import claude_cli
 from app.services.estudio import (almacen, asistente, creaciones, grafo, maestros, medios, recursos, referencias,
                                   series, voz_clonada)
 from app.services.estudio import miniatura as portada_video
-from app.services.estudio import clips, editor, escenas_clip, flow_gen, graficos, limpieza, publicar, retoques
+from app.services.estudio import (biblioteca, clips, editor, escenas_clip, fabrica, flow_gen, graficos, limpieza, publicar,
+                                  retoques, virales, clonar)
 
 router = new_router()
 router.tags = ["Estudio"]
@@ -528,6 +529,250 @@ def clips_original(cid: str):
 def clips_short(cid: str, nombre: str, descargar: bool = Query(default=False)):
     ruta = _clip(clips.ruta_export, cid, nombre)
     return FileResponse(ruta, media_type="video/mp4", filename=f"short-{nombre}" if descargar else None)
+
+
+@router.get("/estudio/fabrica/catalogo", summary="Nichos, estilos y formatos de la Fabrica")
+def fabrica_catalogo():
+    return fabrica.catalogo()
+
+
+# (antes que /estudio/fabrica/{fid}: si no, "biblioteca" se tomaria por un id)
+@router.get("/estudio/fabrica/moldes", summary="Moldes: opciones guardadas de videos que funcionan")
+def fabrica_moldes():
+    return {"moldes": fabrica.moldes()}
+
+
+@router.post("/estudio/fabrica/moldes", summary="Guardar un molde (de las opciones dadas o de un video: desde)")
+def fabrica_guardar_molde(body: dict = Body(...)):
+    return _clip(fabrica.guardar_molde, body.get("nombre"), body.get("opciones"), body.get("desde"))
+
+
+@router.delete("/estudio/fabrica/moldes/{mid}", summary="Borrar un molde")
+def fabrica_borrar_molde(mid: str):
+    return _clip(fabrica.borrar_molde, mid)
+
+
+@router.get("/estudio/fabrica/ideas", summary="Banco de temas de un nicho")
+def fabrica_ideas(nicho: str = "mapas"):
+    return {"ideas": fabrica.ideas(nicho)}
+
+
+@router.post("/estudio/fabrica/ideas", summary="Claude propone temas nuevos para el banco (sin repetir lo hecho)")
+def fabrica_sugerir(body: dict = Body(...)):
+    return {"ideas": _clip(fabrica.sugerir_temas, body.get("nicho") or "mapas", body.get("serie") or "", int(body.get("cuantos") or 10))}
+
+
+@router.delete("/estudio/fabrica/ideas", summary="Quitar un tema del banco")
+def fabrica_quitar_idea(nicho: str, tema: str):
+    return {"ideas": fabrica.quitar_idea(nicho, tema)}
+
+
+@router.get("/estudio/virales", summary="Ultimo analisis de ideas virales")
+def virales_ultimo():
+    return {"analisis": virales.ultimo()}
+
+
+@router.post("/estudio/virales", summary="Analizar cuentas: videos que hacen 3x su mediana (outliers)")
+def virales_analizar(body: dict = Body(...)):
+    return _clip(virales.analizar, body.get("cuentas") or [])
+
+
+@router.post("/estudio/virales/detalle", summary="Detalle de un video: gancho de 3 s, likes y comentarios")
+def virales_detalle(body: dict = Body(...)):
+    return _clip(virales.detalle, str(body.get("url") or ""))
+
+
+@router.post("/estudio/virales/temas", summary="Convertir videos virales en temas propios del banco de la Fabrica")
+def virales_temas(body: dict = Body(...)):
+    return {"ideas": _clip(virales.a_temas, body.get("videos") or [], body.get("nicho") or "mapas", body.get("serie") or "")}
+
+
+@router.get("/estudio/fabrica/parecido", summary="Video ya hecho que se parece a un tema (o null)")
+def fabrica_parecido(tema: str, nicho: str = ""):
+    return {"parecido": fabrica.parecido(tema, nicho or None)}
+
+
+@router.get("/estudio/fabrica/estilos", summary="Galeria de estilos de la Fabrica (hace las muestras que falten)")
+def fabrica_estilos():
+    return fabrica.estilos_galeria()
+
+
+@router.get("/estudio/fabrica/estilos/{estilo}/muestra", summary="Imagen de muestra de un estilo")
+def fabrica_estilo_muestra(estilo: str):
+    return FileResponse(_clip(fabrica.ruta_muestra, estilo), media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=604800"})
+
+
+@router.get("/estudio/fabrica/biblioteca", summary="Pegatinas e ilustraciones de la Fabrica (base y propias)")
+def fabrica_biblioteca():
+    return biblioteca.listar()
+
+
+@router.get("/estudio/fabrica/biblioteca/{tipo}/{clave}", summary="Imagen de una pegatina o ilustracion")
+def fabrica_biblioteca_imagen(tipo: str, clave: str, familia: str = Query("", description="plano, grabado (vacio: madera)")):
+    ruta = biblioteca.ruta(tipo, clave, familia or None)
+    if not ruta:
+        raise HTTPException(404, "ese dibujo no existe")
+    return FileResponse(ruta, media_type="image/webp", headers={"Cache-Control": "no-cache"})
+
+
+@router.post("/estudio/fabrica/biblioteca/crear", summary="Crear un dibujo con Nano Banana (Flow, solo en el PC local)")
+def fabrica_biblioteca_crear(body: dict = Body(...)):
+    """body: {"tipo": "pegatinas|ilustraciones", "descripcion", "nombre"?, "clase"?: "personaje|objeto",
+    "familia"?: "plano|grabado" (sin ella, madera)}. Tarda ~1 min."""
+    familia = body.get("familia") if body.get("familia") in biblioteca.FAMILIAS else None
+    return _clip(biblioteca.crear, body.get("tipo"), body.get("descripcion"), body.get("nombre") or "",
+                 body.get("clase") or "personaje", False, familia)
+
+
+@router.post("/estudio/fabrica/biblioteca/subir", summary="Subir un dibujo propio a la biblioteca")
+async def fabrica_biblioteca_subir(archivo: UploadFile = File(...), tipo: str = Form(...), nombre: str = Form(...),
+                                   descripcion: str = Form(default=""), fondo_verde: bool = Form(default=False)):
+    datos = await archivo.read()
+    if len(datos) > 25 * 1024 * 1024:
+        raise HTTPException(400, "la imagen pesa mas de 25 MB")
+    return _clip(biblioteca.subir, tipo, datos, nombre, descripcion, fondo_verde)
+
+
+@router.delete("/estudio/fabrica/biblioteca/{tipo}/{clave}", summary="Borrar un dibujo propio")
+def fabrica_biblioteca_borrar(tipo: str, clave: str):
+    _clip(biblioteca.borrar, tipo, clave)
+    return {"ok": True}
+
+
+@router.get("/estudio/clones", summary="Videos clonados (recetas)")
+def clones_listar():
+    return {"clones": clonar.listar()}
+
+
+@router.post("/estudio/clones", summary="Clonar un video desde un enlace (saca su receta)")
+def clones_crear(body: dict = Body(...)):
+    return _clip(clonar.crear, str(body.get("url") or ""))
+
+
+@router.post("/estudio/clones/subir", summary="Clonar un video subido (saca su receta)")
+async def clones_subir(video: UploadFile = File(...)):
+    datos = await video.read()
+    if len(datos) > 300 * 1024 * 1024:
+        raise HTTPException(400, "el video pesa mas de 300 MB")
+    return _clip(clonar.crear, "", datos, video.filename or "")
+
+
+@router.get("/estudio/clones/{cid}", summary="Receta, planos y estado de un clon")
+def clones_ver(cid: str):
+    return _clip(clonar.ver, cid)
+
+
+@router.delete("/estudio/clones/{cid}", summary="Borrar un clon")
+def clones_borrar(cid: str):
+    _clip(clonar.borrar, cid)
+    return {"ok": True}
+
+
+@router.get("/estudio/clones/{cid}/foto/{nombre}", summary="Fotograma de un plano del video clonado")
+def clones_foto(cid: str, nombre: str):
+    return FileResponse(_clip(clonar.ruta_foto, cid, nombre), media_type="image/jpeg")
+
+
+@router.post("/estudio/fabrica/{fid}/clip/{n}", summary="Subir el clip de video de una escena (hecho aparte con su prompt)")
+async def fabrica_subir_clip(fid: str, n: int, video: UploadFile = File(...)):
+    datos = await video.read()
+    if len(datos) > 300 * 1024 * 1024:
+        raise HTTPException(400, "el clip pesa mas de 300 MB")
+    return _clip(fabrica.subir_clip, fid, n, datos, video.filename or "")
+
+
+@router.delete("/estudio/fabrica/{fid}/clip/{n}", summary="Quitar el clip de video de una escena")
+def fabrica_borrar_clip(fid: str, n: int):
+    return _clip(fabrica.borrar_clip, fid, n)
+
+
+@router.post("/estudio/fabrica/audio", summary="Subir una narracion grabada (el guion se adapta a ella)")
+async def fabrica_audio(audio: UploadFile = File(...)):
+    """Devuelve {"voz": "propia:<archivo>", "duracion"}: se pasa esa voz al crear el video."""
+    datos = await audio.read()
+    if len(datos) > 100 * 1024 * 1024:
+        raise HTTPException(400, "el audio pesa mas de 100 MB")
+    return _clip(fabrica.subir_audio, datos, audio.filename or "")
+
+
+@router.get("/estudio/fabrica", summary="Videos de la Fabrica")
+def fabrica_listar():
+    return {"videos": fabrica.listar()}
+
+
+@router.post("/estudio/fabrica", summary="Hacer un video entero desde un tema (guion, voz, escenas y montaje)")
+def fabrica_crear(body: dict = Body(...)):
+    """body: {"tema", "nicho"?, "estilo"?, "formatos"?: ["9:16", "16:9", "1:1"], "voz"?: voz de Microsoft,
+    "clon:<id>" o "propia:<archivo>" (de POST /estudio/fabrica/audio; entonces el tema es opcional), "velocidad"?,
+    "duracion"?: s, "musica"?: "random" | "" | cancion, "musica_volumen"?, "subtitulos"?: bool, "idioma"?}.
+    Trabaja en segundo plano: consulta GET /estudio/fabrica/{id}."""
+    return _clip(fabrica.crear, body)
+
+
+@router.post("/estudio/fabrica/lote", summary="Varios videos de la Fabrica con las mismas opciones (se hacen de uno en uno)")
+def fabrica_lote(body: dict = Body(...)):
+    """body: {"temas": ["tema", ...] o [{"tema", "estilo"?, "nicho"?...}], "opciones"?: las de POST /estudio/fabrica}."""
+    return _clip(fabrica.lote, body.get("temas"), body.get("opciones") or {})
+
+
+@router.get("/estudio/fabrica/{fid}", summary="Estado, guion y videos de un video de la Fabrica")
+def fabrica_ver(fid: str):
+    return _clip(fabrica.ver, fid)
+
+
+@router.delete("/estudio/fabrica/{fid}", summary="Borrar un video de la Fabrica")
+def fabrica_borrar(fid: str):
+    _clip(fabrica.borrar, fid)
+    return {"ok": True}
+
+
+@router.patch("/estudio/fabrica/{fid}", summary="Renombrar un video de la Fabrica")
+def fabrica_renombrar(fid: str, body: dict = Body(...)):
+    return _clip(fabrica.renombrar, fid, body.get("titulo"))
+
+
+@router.post("/estudio/fabrica/{fid}/duplicar", summary="Copiar un video de la Fabrica (guion, voz, escenas y videos)")
+def fabrica_duplicar(fid: str):
+    return _clip(fabrica.duplicar, fid)
+
+
+@router.post("/estudio/fabrica/{fid}/liberar", summary="Liberar espacio de un video de la Fabrica (cache de escenas)")
+def fabrica_liberar(fid: str):
+    return {"liberado": _clip(fabrica.liberar, fid), **_clip(fabrica.espacio, fid)}
+
+
+@router.post("/estudio/fabrica/{fid}/montar", summary="Seguir un video parado en revision (voz, musica y montaje)")
+def fabrica_montar(fid: str, body: dict = Body(default={})):
+    return _clip(fabrica.montar, fid, body.get("opciones"))
+
+
+@router.post("/estudio/fabrica/{fid}/siguiente", summary="Siguiente episodio: un video que sigue la historia de este")
+def fabrica_siguiente(fid: str, body: dict = Body(default={})):
+    return _clip(fabrica.siguiente_episodio, fid, body.get("idea"))
+
+
+@router.post("/estudio/fabrica/{fid}/rehacer", summary="Rehacer desde el guion, la voz o el render (con opciones nuevas)")
+def fabrica_rehacer(fid: str, body: dict = Body(default={})):
+    """body: {"desde": "guion|voz|render", "opciones"?: {estilo, formatos, voz...}}."""
+    return _clip(fabrica.rehacer, fid, body.get("desde") or "render", body.get("opciones"))
+
+
+@router.post("/estudio/fabrica/{fid}/editor", summary="Abrir un video de la Fabrica en el editor del Estudio (crea un proyecto)")
+def fabrica_editor(fid: str, body: dict = Body(default={})):
+    """body: {"formato"?: "9:16"}. Devuelve {"proyecto": id}; las etapas hasta la asignacion corren solas."""
+    return _clip(fabrica.abrir_en_editor, fid, body.get("formato"))
+
+
+@router.put("/estudio/fabrica/{fid}/guion", summary="Guardar el guion editado y rehacer desde la voz")
+def fabrica_guion(fid: str, body: dict = Body(...)):
+    return _clip(fabrica.guardar_guion, fid, body.get("guion"))
+
+
+@router.get("/estudio/fabrica/{fid}/video/{formato}", summary="Un video terminado (formato 9x16, 16x9 o 1x1)")
+def fabrica_video(fid: str, formato: str, descargar: bool = Query(default=False)):
+    ruta = _clip(fabrica.ruta_video, fid, formato.replace("x", ":"))
+    return FileResponse(ruta, media_type="video/mp4", filename=f"fabrica-{fid}-{formato}.mp4" if descargar else None)
 
 
 @router.get("/estudio/graficos/plantillas", summary="Plantillas de graficos animados (HyperFrames)")

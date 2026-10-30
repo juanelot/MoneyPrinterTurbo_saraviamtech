@@ -96,7 +96,8 @@ async function main() {
   const listas = hechas();
   const pendientes = escenas.filter((e) => !listas.has(Number(e.scene_number)));
   emitir({ evento: 'inicio', total: escenas.length, pendientes: pendientes.length, listas: escenas.length - pendientes.length });
-  if (!pendientes.length) return fin(0, { evento: 'fin', ok: 0, error: 0, detenido: false });
+  // nada que hacer: sin navegador que cerrar (fin() aun no existe aqui)
+  if (!pendientes.length) return [0, { evento: 'fin', ok: 0, error: 0, detenido: false }];
 
   // Un proyecto de Flow por corrida; si la pagina se rompe se reconecta al mismo.
   let sesion = null;

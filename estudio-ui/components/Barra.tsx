@@ -19,6 +19,7 @@ export default function Barra() {
           <Link href="/" className="boton boton-fantasma">Mis videos</Link>
           <Link href="/maestros" className="boton boton-fantasma">Prompts maestros</Link>
           <Link href="/clips" className="boton boton-fantasma">Clip Studio</Link>
+          <Link href="/fabrica" className="boton boton-fantasma">Fabrica</Link>
         </nav>
       </div>
     </header>

@@ -1,0 +1,72 @@
+<!doctype html>
+<!-- Base de todas las escenas de la Fabrica. Python cambia __ANCHO__, __ALTO__, __DURACION__, __ESTILO__ y
+     __SCRIPTS__ (los extra de la escena, p. ej. el mapa), y copia escenas/<tipo>.js como escena.js. -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="estilos.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: __ANCHO__px; height: __ALTO__px; overflow: hidden; background: var(--fondo); }
+    body { font-family: var(--f-texto); color: var(--tinta); }
+    #root, #escena, .fx-fondo, .fx-capa { position: absolute; inset: 0; }
+    #escena { z-index: 2; }
+    .fx-fondo { z-index: 0; overflow: hidden; }
+    .fx-capa { pointer-events: none; }
+    .acento { color: var(--acento); }
+    .titulo { font-family: var(--f-titulo); font-weight: var(--peso-titulo); text-transform: var(--mayus);
+              letter-spacing: var(--espaciado); line-height: 1.08; text-shadow: var(--sombra-titulo); }
+    .subs { position: absolute; left: 6%; right: 6%; z-index: 6; text-align: center; transform: translateY(-50%);
+            font-family: var(--f-subs); font-weight: 800; line-height: 1.15; color: var(--sub-color);
+            -webkit-text-stroke: 0.09em var(--sub-borde); paint-order: stroke fill; text-shadow: 0 0.05em 0.2em rgba(0,0,0,0.45); }
+    .sub-activa { color: var(--sub-resalte); }
+    .etq-mapa { position: absolute; z-index: 5; transform: translate(-50%, -50%); white-space: nowrap; font-family: var(--f-titulo);
+                font-weight: 700; letter-spacing: 0.1em; color: var(--tinta); text-transform: uppercase;
+                text-shadow: 0 0 0.3em var(--tierra), 0 0 0.6em var(--tierra); }
+    .rotulo { position: absolute; z-index: 4; text-align: center; font-family: var(--f-dato); font-weight: var(--peso-titulo);
+              line-height: 1; color: var(--tinta); text-shadow: 0 0 0.25em var(--fondo), 0 0 0.5em var(--fondo); }
+    /* sobre satelite los textos van en blanco con sombra (la foto no tiene un color de fondo fijo) */
+    .sat .etq-mapa { color: #fff; font-family: var(--f-texto); font-weight: 800; letter-spacing: 0.04em;
+                     text-shadow: 0 0.06em 0.25em rgba(0,0,0,0.85), 0 0 0.6em rgba(0,0,0,0.45); }
+    .sat .rotulo { color: #fff; text-shadow: 0 0.04em 0.2em rgba(0,0,0,0.8), 0 0 0.5em rgba(0,0,0,0.4); }
+    .pieza { position: absolute; z-index: 4; width: 0; height: 0; }
+    .pieza > * { position: absolute; left: 0; top: 0; }
+    .bandera { border-radius: 0.14em; background: #fff; padding: 0.1em; box-shadow: 0 0.25em 0.6em rgba(0,0,0,0.45);
+               font-size: 30px; transform-origin: 50% 50%; }
+    .bandera img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 0.08em; }
+    .ojos { position: absolute; left: 0; right: 0; top: 18%; display: flex; justify-content: center; gap: 6%; }
+    .ojo { width: 27%; aspect-ratio: 1 / 1.15; background: #fff; border-radius: 50%; border: 2px solid #1d1a14;
+           display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .ojo > div { width: 52%; height: 52%; background: #111; border-radius: 50%; }
+    .pegatina { position: absolute; z-index: 4; }
+    .pegatina img { display: block; filter: drop-shadow(0 0.6vmin 0.8vmin rgba(0,0,0,0.5)); }
+    .circulo { border-radius: 50%; border: 0.6vmin solid #fff; box-shadow: 0 0 0 0.5vmin rgba(0,0,0,0.35), inset 0 0 0 0.5vmin rgba(0,0,0,0.25); }
+    .golpe { position: absolute; z-index: 5; text-align: center; font-family: "Montserrat", sans-serif; font-weight: 900;
+             text-transform: uppercase; line-height: 0.95; color: #e8312f; -webkit-text-stroke: 0.06em #fff; paint-order: stroke fill;
+             text-shadow: 0 0.06em 0.15em rgba(0,0,0,0.45); }
+    .ilus { position: absolute; inset: 0; overflow: hidden; background: #000; }
+    .ilus img { position: absolute; }
+    .indicador { position: absolute; z-index: 7; display: flex; align-items: baseline; gap: 0.5em;
+                 white-space: nowrap; background: var(--panel); border-radius: 999px; padding: 0.35em 0.9em;
+                 box-shadow: 0 0.2em 0.8em rgba(0, 0, 0, 0.25); }
+    .indicador-nombre { font-family: var(--f-texto); font-weight: 700; color: var(--tinta-suave); text-transform: uppercase;
+                        letter-spacing: 0.06em; font-size: 0.7em; }
+    .indicador-cifra { display: inline-block; font-family: var(--f-dato); font-weight: var(--peso-titulo); color: var(--acento); font-size: 1.25em; }
+    .marca { position: absolute; z-index: 8; white-space: nowrap; font-family: var(--f-titulo);
+             font-weight: var(--peso-titulo); color: var(--tinta); background: var(--panel); border-radius: 0.4em;
+             padding: 0.3em 0.8em; border-bottom: 0.12em solid var(--acento); box-shadow: 0 0.3em 1.2em rgba(0, 0, 0, 0.3); }
+    .tarjeta { position: absolute; z-index: 3; background: var(--panel); border-radius: 0.35em; padding: 0.5em 0.7em;
+               box-shadow: 0 0.3em 1.2em rgba(0, 0, 0, 0.25); }
+  </style>
+</head>
+<body data-estilo="__ESTILO__">
+  <div id="root" data-composition-id="main" data-start="0" data-duration="__DURACION__" data-width="__ANCHO__" data-height="__ALTO__">
+    <div id="escena" class="clip" data-start="0" data-duration="__DURACION__" data-track-index="0"></div>
+  </div>
+  <script src="gsap.min.js"></script>
+  <script src="datos.js"></script>
+  <script src="nucleo.js"></script>
+__SCRIPTS__
+  <script src="escena.js"></script>
+</body>
+</html>

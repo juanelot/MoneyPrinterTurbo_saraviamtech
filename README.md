@@ -168,6 +168,23 @@ Página propia en la barra de arriba. Subes un video largo (podcast, entrevista,
 
 Se guarda todo en `storage/estudio/clips/<id>/`.
 
+### Fábrica (videos enteros desde un tema)
+Página propia en la barra de arriba. Escribes un tema y sale el video terminado, sin modelos de video ni créditos: todo se dibuja con código (HyperFrames + GSAP).
+
+1. **Guion por escenas:** Claude elige el tipo de cada escena según el nicho y marca la palabra en la que pasa cada animación.
+2. **Voz:** de Microsoft (con el tiempo de cada palabra), tu voz clonada o una grabación tuya (Whisper la escucha y Claude reparte tu texto sin cambiarlo).
+3. **Escenas dibujadas** justo cuando se dicen: mapas que se mueven (países, ríos, rutas, medidas, satélite, banderas con ojos, pegatinas), cifras que cuentan, barras, listas, versus, líneas de tiempo e ilustraciones a pantalla completa.
+4. **Montaje** con música (baja sola cuando habla la voz) y efectos de sonido, en 9:16, 16:9 y 1:1.
+
+- **Nichos:** mapas e historia, datos y comparaciones, curiosidades, finanzas y economía. Cada uno tiene su estructura y sus escenas.
+- **10 estilos** con galería de muestras: papel antiguo, keynote oscuro, documental, periódico, pizarra, cuaderno, minimal, pop cómic, neón y terminal. Cada estilo tiene sus colores, letras (OFL), textura y forma de entrar, y su familia de dibujos (muñecos de madera, dibujo plano o grabado antiguo).
+- **Biblioteca de dibujos:** pegatinas e ilustraciones hechas con Nano Banana en Flow (`motion/fabrica/datos/hacer_pegatinas.py` y `hacer_estilos.py`, retomables). Puedes crear las tuyas (solo en local) o subirlas. Si a Claude le falta una, la pide y se dibuja al hacer el guion.
+- **Varios videos:** marca "uno por línea" y cada línea del tema es un video con las mismas opciones; se hacen de uno en uno.
+- **Abrir en el editor:** el botón del lápiz junto a cada video crea un proyecto del Estudio con esa voz y un clip por escena, listo para retocar en el editor (música, textos, capas…).
+- Rehacer con otro estilo o formato solo vuelve a dibujar; las escenas que no cambian salen de la caché.
+
+Se guarda en `storage/estudio/fabrica/<id>/`; las muestras de la galería, en `storage/estudio/fabrica_muestras/`.
+
 ### Miniatura
 - Claude propone de 1 a 5 conceptos, cada uno con su texto y el prompt para Flow, con y sin texto (para Canva).
 - Se basa en el guion, el estilo, las imágenes del proyecto y, si la subes, una miniatura de referencia (copia el estilo, no el contenido).
@@ -438,7 +455,7 @@ docker stack deploy -c docker-stack.yml mpt
 
 ## Automatización por terminal
 
-Dos CLIs para que Hermes, n8n o un cron trabajen sin abrir el navegador. Usan la API del Estudio:
+Varios CLIs para que Hermes, n8n o un cron trabajen sin abrir el navegador. Usan la API del Estudio:
 
 ```bash
 # Contra el VPS (por defecto): https://studio.saraviamtech.com/api/motor
@@ -468,6 +485,18 @@ python maestros_cli.py video --maestro "paper craft" --creacion <id> --narracion
 ```
 
 Sale con código 0 si está listo, 1 si hay un error y 2 si el flujo espera una respuesta (contéstala con `responder`).
+
+**`fabrica_cli.py`** hace videos de la Fábrica, uno o un lote, y los descarga:
+
+```bash
+python fabrica_cli.py --catalogo                                                   # nichos, estilos y formatos
+python fabrica_cli.py --tema "Por qué Bolivia no tiene mar" --estilo papel --out ./videos
+python fabrica_cli.py --temas-archivo temas.txt --nicho finanzas --estilo minimal --formatos 9:16,16:9
+python fabrica_cli.py --perfil fabrica_perfil.json --tema "..." --editor           # y lo abre en el editor
+python fabrica_cli.py --seguir <id>,<id> --out ./videos                            # retomar videos ya creados
+```
+
+Imprime `FABRICA=<id>` por video al empezar, `VIDEO=<ruta>` por cada MP4 bajado (con un `.txt` al lado con el título y la descripción) y `PROYECTO=<id>` si se pide `--editor`. Sale con código 0 si todos terminan bien y 1 si alguno falla. Hay un perfil de ejemplo en `fabrica_perfil.example.json`.
 
 **`zenn_cli.py`** genera videos de la app Virales (no del Estudio). Tiene tres modos y los mismos controles que su formulario:
 

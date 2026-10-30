@@ -1,0 +1,15 @@
+{
+  "nicho": "mapas",
+  "estilo": "papel",
+  "formatos": ["9:16"],
+  "duracion": 55,
+  "voz": "es-ES-AlvaroNeural-Male",
+  "musica": "random",
+  "musica_volumen": 0.16,
+  "subtitulos": true,
+  "efectos": true,
+  "foco": true,
+  "serie": "",
+  "marca": "@tucanal",
+  "nuevos": true
+}

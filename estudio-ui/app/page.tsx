@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Copy, Download, Eraser, Film, Loader2, Pencil, Play, Plus, SquarePen, Trash2, X } from "lucide-react";
 import { api, mmss, tamano, url, type Espacio, type ResumenProyecto } from "@/lib/api";
+import { Accion } from "@/components/ui";
 import { MARCA } from "@/lib/marca";
 
 // Ejemplos que rotan en el campo de titulo: el tipo de contenido que hace el Estudio.
@@ -87,7 +88,7 @@ export default function Inicio() {
 
   async function liberarTodo() {
     if (!espacio || !confirm(
-      `¿Liberar ${tamano(espacio.liberable)}? Se borran solo la cache de clips y los archivos intermedios del montaje. ` +
+      `¿Liberar ${tamano(espacio.liberable)}? Se borran solo la cache de clips, los archivos intermedios del montaje y las escenas ya dibujadas de la Fábrica. ` +
       "Tus videos finales y lo que subiste no se tocan; si vuelves a montar un video, los clips se rehacen solos.")) return;
     setLiberando(true);
     try {
@@ -253,17 +254,6 @@ export default function Inicio() {
       {viendo && viendo.mp4 && <Reproductor p={viendo} onCerrar={() => setViendo(null)} />}
     </main>
   );
-}
-
-function Accion({ icono, texto, onClick, href, disabled, soloIcono, peligro, derecha }: {
-  icono: React.ReactNode; texto: string; onClick?: () => void; href?: string;
-  disabled?: boolean; soloIcono?: boolean; peligro?: boolean; derecha?: boolean;
-}) {
-  const clase = `boton boton-fantasma !gap-1.5 !px-2 !py-1.5 text-xs ${peligro ? "hover:!text-error" : ""} ${derecha ? "ml-auto" : ""}`;
-  const contenido = <>{icono}{!soloIcono && <span className="hidden sm:inline">{texto}</span>}</>;
-  if (disabled) return <span className={`${clase} pointer-events-none opacity-35`} title={texto}>{contenido}</span>;
-  if (href) return <a href={href} className={clase} title={texto}>{contenido}</a>;
-  return <button onClick={onClick} className={clase} title={texto}>{contenido}</button>;
 }
 
 function Reproductor({ p, onCerrar }: { p: ResumenProyecto; onCerrar: () => void }) {

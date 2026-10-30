@@ -1,0 +1,132 @@
+/* Pieles de la Fabrica: un estilo = colores, letras, textura y forma de entrar. Las escenas son las
+   mismas para todos; solo leen estas variables. Para un estilo nuevo: un bloque [data-estilo="..."]
+   aqui y su ficha en app/services/estudio/fabrica.py (ESTILOS). Fuentes: OFL (fuentes/OFL_*.txt).
+   --textura: dibujo de codigo encima del fondo (rejilla, puntos, lineas o nada); si el estilo tiene
+   texturas/<estilo>_v|h.webp (hacer_estilos.py) va debajo, y sobre los mapas con --textura-mapa y --mezcla-mapa.
+   --entrada: subir, pop, sello, barrido o parpadeo. */
+@font-face { font-family: "Montserrat"; src: url("Montserrat.ttf"); font-weight: 100 900; }
+@font-face { font-family: "EB Garamond"; src: url("EBGaramond.ttf"); font-weight: 400 800; }
+@font-face { font-family: "Inter"; src: url("Inter.ttf"); font-weight: 100 900; }
+@font-face { font-family: "Caveat"; src: url("Caveat.ttf"); font-weight: 400 700; }
+@font-face { font-family: "Playfair Display"; src: url("PlayfairDisplay.ttf"); font-weight: 400 900; }
+@font-face { font-family: "Bangers"; src: url("Bangers.ttf"); }
+@font-face { font-family: "Bebas Neue"; src: url("BebasNeue.ttf"); }
+@font-face { font-family: "Space Mono"; src: url("SpaceMono.ttf"); font-weight: 700; }
+@font-face { font-family: "Orbitron"; src: url("Orbitron.ttf"); font-weight: 400 900; }
+
+body {
+  --f-subs: var(--f-texto); --sombra-titulo: 0 0 0.3em var(--fondo), 0 0 0.6em var(--fondo);
+  --textura-mapa: 0; --mezcla-mapa: multiply; --textura: none;
+}
+
+/* Papel antiguo: mapa de libro de historia, tinta sepia y letra de imprenta. */
+[data-estilo="papel"] {
+  --fondo: #e6d7b0; --fondo-2: #cdb98a; --tinta: #3b3226; --tinta-suave: #6b5b45; --acento: #b8402f; --panel: rgba(250, 242, 220, 0.82);
+  --rojo: #c8423a; --azul: #3f6f9f; --verde: #4f8a4b; --amarillo: #e7b934; --naranja: #d9822b; --morado: #7a5594; --gris: #8c8070;
+  --mar: #6f9e9f; --tierra: #dccb9c; --borde: rgba(59, 50, 38, 0.45); --costa: #4d7f80; --pais-alfa: 0.85;
+  --f-titulo: "EB Garamond", Georgia, serif; --f-texto: "Montserrat", Arial, sans-serif; --f-dato: "EB Garamond", Georgia, serif;
+  --peso-titulo: 700; --mayus: none; --espaciado: 0.01em;
+  --sub-color: #ffffff; --sub-resalte: #ffd84a; --sub-borde: rgba(40, 30, 20, 0.85);
+  --grano: 0.1; --vineta: 0.5; --textura: papel; --entrada: subir; --textura-mapa: 0.55;
+}
+
+/* Keynote oscuro: fondo casi negro, brillo de color y letra sans gruesa. */
+[data-estilo="oscuro"] {
+  --fondo: #0b0f1a; --fondo-2: #1a2240; --tinta: #f2f4fa; --tinta-suave: #9aa3bd; --acento: #5b8cff; --panel: rgba(20, 26, 46, 0.85);
+  --rojo: #ff5a6e; --azul: #5b8cff; --verde: #3ddc97; --amarillo: #ffd447; --naranja: #ff9f43; --morado: #a879ff; --gris: #6b7390;
+  --mar: #070b14; --tierra: #1b2335; --borde: rgba(120, 140, 190, 0.35); --costa: #2a3a5c; --pais-alfa: 0.9;
+  --f-titulo: "Montserrat", Arial, sans-serif; --f-texto: "Montserrat", Arial, sans-serif; --f-dato: "Montserrat", Arial, sans-serif;
+  --peso-titulo: 900; --mayus: none; --espaciado: -0.01em;
+  --sub-color: #ffffff; --sub-resalte: #5b8cff; --sub-borde: rgba(0, 0, 0, 0.9);
+  --grano: 0.08; --vineta: 0.55; --textura: rejilla; --entrada: pop;
+}
+
+/* Documental: negro y oro de cine, letra alta y estrecha en mayusculas, mucho grano. */
+[data-estilo="documental"] {
+  --fondo: #0a0a0a; --fondo-2: #1c1712; --tinta: #f4efe6; --tinta-suave: #a39a8a; --acento: #d4a24c; --panel: rgba(15, 12, 8, 0.85);
+  --rojo: #b5443b; --azul: #4f6d8a; --verde: #5f7d4f; --amarillo: #d4a24c; --naranja: #c0773a; --morado: #6e5a7e; --gris: #7c766c;
+  --mar: #0e1215; --tierra: #2a2620; --borde: rgba(212, 162, 76, 0.45); --costa: #3a4a52; --pais-alfa: 0.8;
+  --f-titulo: "Bebas Neue", "Arial Narrow", sans-serif; --f-texto: "Inter", Arial, sans-serif; --f-dato: "Bebas Neue", "Arial Narrow", sans-serif;
+  --peso-titulo: 400; --mayus: uppercase; --espaciado: 0.04em;
+  --sub-color: #ffffff; --sub-resalte: #d4a24c; --sub-borde: rgba(0, 0, 0, 0.9);
+  --grano: 0.14; --vineta: 0.7; --entrada: barrido; --textura-mapa: 0.35; --mezcla-mapa: screen;
+}
+
+/* Periodico: papel de diario, titulares con serifa negra y rojo de portada. */
+[data-estilo="periodico"] {
+  --fondo: #efe9dc; --fondo-2: #d9d0bd; --tinta: #1b1b1b; --tinta-suave: #555049; --acento: #b3171c; --panel: rgba(245, 240, 228, 0.9);
+  --rojo: #b3171c; --azul: #2f4a6d; --verde: #4b6b3c; --amarillo: #c9a227; --naranja: #b8682c; --morado: #5e4a73; --gris: #8a8577;
+  --mar: #c9c4b6; --tierra: #ece6d6; --borde: rgba(20, 20, 20, 0.55); --costa: #6d6a60; --pais-alfa: 0.8;
+  --f-titulo: "Playfair Display", Georgia, serif; --f-texto: "Inter", Arial, sans-serif; --f-dato: "Playfair Display", Georgia, serif;
+  --peso-titulo: 900; --mayus: none; --espaciado: -0.01em;
+  --sub-color: #ffffff; --sub-resalte: #ffd84a; --sub-borde: rgba(20, 20, 20, 0.9);
+  --grano: 0.12; --vineta: 0.35; --textura: puntos; --entrada: sello; --textura-mapa: 0.6;
+}
+
+/* Pizarra: tiza sobre verde, letra a mano y colores pastel. */
+[data-estilo="pizarra"] {
+  --fondo: #1f3a2e; --fondo-2: #142820; --tinta: #f1efe6; --tinta-suave: #b9c4b5; --acento: #ffd75e; --panel: rgba(20, 40, 30, 0.85);
+  --rojo: #f08a7e; --azul: #8ec5ff; --verde: #a6e3a1; --amarillo: #ffe08a; --naranja: #ffb870; --morado: #c9a7ff; --gris: #a7b0a8;
+  --mar: #1a3328; --tierra: #2d4a3c; --borde: rgba(240, 240, 230, 0.55); --costa: #6f8f80; --pais-alfa: 0.75;
+  --f-titulo: "Caveat", "Comic Sans MS", cursive; --f-texto: "Montserrat", Arial, sans-serif; --f-dato: "Caveat", "Comic Sans MS", cursive;
+  --peso-titulo: 700; --mayus: none; --espaciado: 0;
+  --sub-color: #ffffff; --sub-resalte: #ffd75e; --sub-borde: rgba(10, 25, 18, 0.9);
+  --grano: 0.12; --vineta: 0.5; --entrada: subir; --textura-mapa: 0.5; --mezcla-mapa: soft-light;
+}
+
+/* Cuaderno: hoja de libreta, boli azul y rotulador rojo. */
+[data-estilo="cuaderno"] {
+  --fondo: #fbfaf5; --fondo-2: #ecebe4; --tinta: #23315c; --tinta-suave: #5d6a8f; --acento: #e5484d; --panel: rgba(255, 255, 255, 0.88);
+  --rojo: #ff6b6b; --azul: #4d96ff; --verde: #6bcb77; --amarillo: #ffd93d; --naranja: #ff9f45; --morado: #9b72cf; --gris: #9aa0a6;
+  --mar: #dfeaf5; --tierra: #fffdf6; --borde: rgba(35, 49, 92, 0.5); --costa: #7aa2c8; --pais-alfa: 0.7;
+  --f-titulo: "Caveat", "Comic Sans MS", cursive; --f-texto: "Inter", Arial, sans-serif; --f-dato: "Caveat", "Comic Sans MS", cursive;
+  --peso-titulo: 700; --mayus: none; --espaciado: 0;
+  --sub-color: #ffffff; --sub-resalte: #ffd93d; --sub-borde: rgba(35, 49, 92, 0.95);
+  --grano: 0.04; --vineta: 0.15; --entrada: pop; --textura-mapa: 0.6;
+}
+
+/* Minimal: blanco, mucho aire, un solo azul de acento y letra apretada. Sin grano ni textura. */
+[data-estilo="minimal"] {
+  --fondo: #ffffff; --fondo-2: #f1f3f6; --tinta: #111827; --tinta-suave: #6b7280; --acento: #2563eb; --panel: rgba(255, 255, 255, 0.95);
+  --rojo: #ef4444; --azul: #3b82f6; --verde: #22c55e; --amarillo: #eab308; --naranja: #f97316; --morado: #8b5cf6; --gris: #9ca3af;
+  --mar: #eef2f7; --tierra: #ffffff; --borde: rgba(17, 24, 39, 0.25); --costa: #cbd5e1; --pais-alfa: 0.85;
+  --f-titulo: "Inter", Arial, sans-serif; --f-texto: "Inter", Arial, sans-serif; --f-dato: "Inter", Arial, sans-serif;
+  --peso-titulo: 800; --mayus: none; --espaciado: -0.035em;
+  --sub-color: #111827; --sub-resalte: #2563eb; --sub-borde: rgba(255, 255, 255, 0.95);
+  --sombra-titulo: none; --grano: 0; --vineta: 0; --entrada: barrido;
+}
+
+/* Pop comic: amarillo, puntos de imprenta, contorno negro y letra de vineta. */
+[data-estilo="pop"] {
+  --fondo: #ffd23f; --fondo-2: #ffb100; --tinta: #111111; --tinta-suave: #3a3a3a; --acento: #e4002b; --panel: rgba(255, 255, 255, 0.92);
+  --rojo: #e4002b; --azul: #0057ff; --verde: #00b050; --amarillo: #ffe600; --naranja: #ff7a00; --morado: #8a2be2; --gris: #7a7a7a;
+  --mar: #4cc9f0; --tierra: #fff3c4; --borde: #111111; --costa: #111111; --pais-alfa: 0.95;
+  --f-titulo: "Bangers", Impact, sans-serif; --f-texto: "Montserrat", Arial, sans-serif; --f-dato: "Bangers", Impact, sans-serif;
+  --peso-titulo: 400; --mayus: uppercase; --espaciado: 0.03em;
+  --sub-color: #ffffff; --sub-resalte: #ffe600; --sub-borde: #111111;
+  --sombra-titulo: 0.06em 0.06em 0 #111111; --grano: 0; --vineta: 0.2; --textura: puntos; --entrada: sello;
+}
+
+/* Neon: noche synthwave, rosa y cian que brillan. */
+[data-estilo="neon"] {
+  --fondo: #0d0221; --fondo-2: #261447; --tinta: #f5f3ff; --tinta-suave: #b3a6d9; --acento: #ff2a6d; --panel: rgba(20, 6, 45, 0.85);
+  --rojo: #ff2a6d; --azul: #05d9e8; --verde: #39ff88; --amarillo: #f9f871; --naranja: #ff8c42; --morado: #b967ff; --gris: #6f6a8f;
+  --mar: #0a0418; --tierra: #1b0f3a; --borde: rgba(5, 217, 232, 0.6); --costa: #05d9e8; --pais-alfa: 0.85;
+  --f-titulo: "Orbitron", Arial, sans-serif; --f-texto: "Inter", Arial, sans-serif; --f-dato: "Orbitron", Arial, sans-serif;
+  --peso-titulo: 900; --mayus: uppercase; --espaciado: 0.02em;
+  --sub-color: #ffffff; --sub-resalte: #05d9e8; --sub-borde: rgba(13, 2, 33, 0.95);
+  --sombra-titulo: 0 0 0.12em rgba(255, 42, 109, 0.9), 0 0 0.45em rgba(255, 42, 109, 0.55);
+  --grano: 0.06; --vineta: 0.6; --textura: lineas; --entrada: parpadeo; --textura-mapa: 0.4; --mezcla-mapa: screen;
+}
+
+/* Terminal: pantalla de fosforo verde, letra de maquina y lineas de barrido. */
+[data-estilo="terminal"] {
+  --fondo: #020a04; --fondo-2: #062012; --tinta: #b6ffb0; --tinta-suave: #4fae5a; --acento: #39ff14; --panel: rgba(0, 20, 8, 0.85);
+  --rojo: #ff4d4d; --azul: #3ad6ff; --verde: #39ff14; --amarillo: #e8ff4d; --naranja: #ffa53a; --morado: #c77dff; --gris: #4f6b55;
+  --mar: #010603; --tierra: #0a2412; --borde: rgba(57, 255, 20, 0.5); --costa: #1f7a2e; --pais-alfa: 0.8;
+  --f-titulo: "Space Mono", "Courier New", monospace; --f-texto: "Space Mono", "Courier New", monospace; --f-dato: "Space Mono", "Courier New", monospace;
+  --peso-titulo: 700; --mayus: uppercase; --espaciado: -0.02em;
+  --sub-color: #e9ffe6; --sub-resalte: #39ff14; --sub-borde: rgba(0, 0, 0, 0.95);
+  --sombra-titulo: 0 0 0.15em rgba(57, 255, 20, 0.7), 0 0 0.5em rgba(57, 255, 20, 0.35);
+  --grano: 0.08; --vineta: 0.6; --textura: lineas; --entrada: parpadeo;
+}

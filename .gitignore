@@ -31,3 +31,8 @@ perfil_zenn.json
 tools/flow/node_modules/
 tools/flow/.flow.lock/
 tools/flow/state.json
+
+# Fabrica: crudos de Flow al hacer la biblioteca de dibujos
+MoneyPrinterTurbo/motion/fabrica/datos/_flow/
+MoneyPrinterTurbo/motion/fabrica/datos/_lote.log
+MoneyPrinterTurbo/motion/fabrica/datos/_estilos.log

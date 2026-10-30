@@ -152,6 +152,23 @@ def _ruta_filtro(ruta: str, cwd: str) -> str:
     return "'" + ruta.replace("\\", "/").replace(":", "\\:").replace("'", "\\'") + "'"
 
 
+@lru_cache(maxsize=64)
+def entrada_fuerte(musica: str, _mtime: float = 0) -> float:
+    """Segundo en que la cancion ya suena a su volumen normal (4 s seguidos a menos de 6 dB de su mediana).
+    Con la musica baja y el ducking, una intro suave no se oye y parece que la musica entra tarde."""
+    import numpy as np
+    import subprocess
+    r = subprocess.run([medios.ffmpeg(), "-v", "error", "-t", "90", "-i", musica, "-ac", "1", "-ar", "8000",
+                        "-f", "f32le", "-"], capture_output=True, timeout=120, **medios.SIN_VENTANA)
+    a = np.frombuffer(r.stdout or b"", np.float32)
+    db = [20 * np.log10(np.sqrt(np.mean(a[i:i + 8000] ** 2)) + 1e-9) for i in range(0, len(a) - 8000, 8000)]
+    if len(db) < 8:
+        return 0.0
+    umbral = float(np.median(db)) - 6
+    k = next((i for i in range(len(db) - 3) if min(db[i:i + 4]) >= umbral), 0)
+    return float(min(k, 60))
+
+
 def acabar(combinado: str, audio: str, srt: str | None, p: dict, w: int, h: int,
            duracion: float, destino: str, ass: str | None = None, sfx: str | None = None,
            ducking: bool = False, color: str | None = None, ass_extra: str | None = None):
@@ -170,6 +187,8 @@ def acabar(combinado: str, audio: str, srt: str | None, p: dict, w: int, h: int,
     m_desde = max(0.0, float(p.get("musica_desde") or 0))
     m_hasta = min(duracion, float(p.get("musica_hasta") or duracion))
     m_offset = max(0.0, float(p.get("musica_offset") or 0))
+    if musica and "musica_offset" not in p:   # sin offset del editor: se salta la intro suave de la cancion
+        m_offset = entrada_fuerte(musica, os.path.getmtime(musica))
     if musica and m_hasta - m_desde < 0.2:
         musica = ""
     if musica:

@@ -60,7 +60,8 @@ export async function nuevoProyecto(page) {
     await nuevo.click({ timeout: 20000 });
   } catch {
     exigirSesion(page);
-    throw new SinSesion('No aparece el boton de proyecto nuevo en Flow (¿sesion cerrada?).');
+    // con sesion pero Flow lento o con un aviso encima: fallo normal (se reintenta), no "sin sesion"
+    throw new Error('No aparece el boton de proyecto nuevo en Flow (¿pagina lenta?).');
   }
   await page.waitForURL(/\/project\/[0-9a-f-]{36}/, { timeout: 30000 });
   return page.url().match(/\/project\/([0-9a-f-]{36})/)[1];

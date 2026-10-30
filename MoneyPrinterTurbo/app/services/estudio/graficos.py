@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 
 from app.models.schema import VideoAspect
 from app.services.estudio import almacen, grafo
@@ -166,10 +167,15 @@ def renderizar(pid, plantilla, valores=None, color=None, posicion=None, duracion
                 json.dump(variables, f, ensure_ascii=False)
             salida_tmp = os.path.join(tmp, "grafico.webm")
             env = {**os.environ, "HYPERFRAMES_NO_TELEMETRY": "1", "DO_NOT_TRACK": "1", "HYPERFRAMES_NO_UPDATE_CHECK": "1"}
-            r = subprocess.run([shutil.which("node"), CLI, "render", tmp, "-o", salida_tmp, "--format", "webm", "-w", "1",
-                                "--quiet", "--variables-file", os.path.join(tmp, "variables.json")],
-                               cwd=DIR_MOTION, env=env, capture_output=True, text=True, encoding="utf-8",
-                               errors="replace", timeout=900)
+            # HyperFrames da solo 5 s a "ffmpeg -version": con el equipo cargado falla aunque ffmpeg este bien
+            for intento in range(3):
+                r = subprocess.run([shutil.which("node"), CLI, "render", tmp, "-o", salida_tmp, "--format", "webm", "-w", "1",
+                                    "--quiet", "--variables-file", os.path.join(tmp, "variables.json")],
+                                   cwd=DIR_MOTION, env=env, capture_output=True, text=True, encoding="utf-8",
+                                   errors="replace", timeout=900)
+                if r.returncode == 0 or "FFmpeg cannot start" not in (r.stderr or "") + (r.stdout or ""):
+                    break
+                time.sleep(2)
             if r.returncode != 0 or not os.path.isfile(salida_tmp):
                 raise RuntimeError(f"HyperFrames no pudo renderizar el grafico: {(r.stderr or r.stdout)[-500:]}")
             os.replace(salida_tmp, final)

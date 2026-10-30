@@ -5,11 +5,13 @@ toca lo subido (recursos/, voz_propia/), el guion, la voz ni el video final.
 
 Tras liberar, el proyecto sigue "al dia": el video final no cambia. Si luego se
 vuelve a montar, los clips se rehacen (1-3 min).
+
+Tambien cubre la Fabrica: su cache de escenas ya dibujadas (fabrica.liberar).
 """
 import os
 import shutil
 
-from app.services.estudio import almacen, grafo
+from app.services.estudio import almacen, fabrica, grafo
 
 # Relativo a la carpeta del proyecto.
 CARPETAS = ("render/clips", "render/audio_clips", "render/sonido_clips", "render/voz_escenas")
@@ -76,19 +78,29 @@ def resumen():
     for pid in sorted(os.listdir(almacen.dir_proyectos())):
         if almacen.PATRON_ID.match(pid) and os.path.isfile(almacen.dir_proyecto(pid, "proyecto.json")):
             filas.append({"id": pid, **espacio(pid)})
-    return {"total": sum(f["total"] for f in filas), "liberable": sum(f["liberable"] for f in filas),
-            "proyectos": filas}
+    fab = fabrica.resumen_espacio()
+    return {"total": sum(f["total"] for f in filas + fab), "liberable": sum(f["liberable"] for f in filas + fab),
+            "proyectos": filas, "fabrica": fab}
 
 
 def liberar_todo():
     """Libera todos los proyectos que no esten trabajando."""
     liberado, hechos, ocupados = 0, 0, []
-    for f in resumen()["proyectos"]:
+    todo = resumen()
+    for f in todo["proyectos"]:
         if not f["liberable"]:
             continue
         try:
             liberado += liberar(f["id"])
             hechos += 1
         except ErrorLimpieza:
+            ocupados.append(f["id"])
+    for f in todo["fabrica"]:
+        if not f["liberable"]:
+            continue
+        try:
+            liberado += fabrica.liberar(f["id"])
+            hechos += 1
+        except RuntimeError:
             ocupados.append(f["id"])
     return {"liberado": liberado, "proyectos": hechos, "ocupados": ocupados}

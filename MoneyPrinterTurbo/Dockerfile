@@ -37,6 +37,9 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
         fonts-liberation fonts-noto-core fonts-noto-color-emoji fonts-dejavu-core fontconfig && \
     rm -rf /var/lib/apt/lists/* && fc-cache -f
 ENV CONTAINER=true HYPERFRAMES_NO_TELEMETRY=1 HYPERFRAMES_NO_UPDATE_CHECK=1 DO_NOT_TRACK=1
+# Modelos de Whisper ("base" del Estudio y "small" de la Fabrica, ~460 MB) en el volumen de storage:
+# se bajan una vez y sobreviven a recrear el contenedor
+ENV HF_HOME=/MoneyPrinterTurbo/storage/.modelos
 COPY motion/package.json motion/package-lock.json ./motion/
 RUN cd motion && npm ci --no-audit --no-fund && node node_modules/hyperframes/bin/hyperframes.mjs browser ensure
 

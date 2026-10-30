@@ -66,6 +66,183 @@ export const clipStudio = {
   urlShort: (cid: string, archivo: string, descargar = false) => `${BASE}/clips/${cid}/shorts/${archivo}${descargar ? "?descargar=true" : ""}`,
 };
 
+// Fabrica: videos enteros desde un tema (guion por escenas, voz y escenas dibujadas con codigo).
+export type FormatoFabrica = "9:16" | "16:9" | "1:1";
+export type EstadoFabrica = "en cola" | "guion" | "voz" | "render" | "montaje" | "revision" | "listo" | "error";
+export interface CatalogoFabrica {
+  nichos: { id: string; nombre: string; descripcion: string }[];
+  series: { id: string; nombre: string; descripcion: string }[];
+  /** aspecto de los dibujos (familias): madera, plano, grabado, foto, acuarela... */
+  visuales?: { id: string; nombre: string }[];
+  estilos: { id: string; nombre: string; descripcion: string }[];
+  formatos: FormatoFabrica[]; falta: string;
+}
+/** voz: de Microsoft, "clon:<id>" o "propia:<archivo>" (grabacion subida con fabrica.subirAudio). musica: "random", "" o una cancion. */
+export interface OpcionesFabrica {
+  tema: string; nicho: string; estilo: string; formatos: FormatoFabrica[]; voz: string; velocidad: number;
+  duracion: number; musica: string; musica_volumen: number; subtitulos: boolean; efectos: boolean; foco?: boolean; nuevos: boolean; idioma: string;
+  /** serie de formato (mitos, abuela...) o vacio; marca: nombre del canal para el cierre */
+  serie?: string; marca?: string;
+  /** aspecto de los dibujos: "" = el del estilo, o un id de catalogo.visuales */
+  visual?: string;
+  /** clonar: id de la receta a seguir; clips: Claude escribe el prompt de video de cada ilustracion (se hacen aparte) */
+  receta?: string; clips?: boolean;
+  /** se para tras el guion y las imagenes (estado "revision") para subir clips, tu voz o la musica; con clips, siempre */
+  revisar?: boolean;
+}
+/** molde: las opciones de un video que funciona, para repetirlas (sin tema) */
+export interface MoldeFabrica { id: string; nombre: string; creado: number; opciones: Omit<OpcionesFabrica, "tema"> }
+export interface EscenaFabrica { tipo: string; texto: string; [campo: string]: unknown }
+export interface GuionFabrica { titulo: string; descripcion: string; mensaje?: string; colores?: Record<string, string>;
+  indicador?: { nombre: string; antes: string; despues: string } | null; escenas: EscenaFabrica[] }
+export interface VideoFabrica { formato: FormatoFabrica; archivo: string; duracion: number; ancho: number; alto: number; tam_mb: number; creado: number }
+export interface SesionFabrica {
+  id: string; titulo: string; opciones: OpcionesFabrica; creado: number; actualizado: number;
+  estado: EstadoFabrica; progreso: number; mensaje: string; error: string | null;
+  /** videos largos: "00:00 Introduccion\n01:12 ..." para la descripcion de YouTube */
+  capitulos?: string;
+}
+/** muestra: version del video de muestra (0 = todavia se esta haciendo) */
+export interface EstiloFabrica { id: string; nombre: string; descripcion: string; familia?: string; muestra: number }
+export interface GaleriaEstilos { estilos: EstiloFabrica[]; generando: boolean; error: string }
+/** clips: indices de las escenas que tienen un clip de video subido */
+export interface DetalleFabrica extends SesionFabrica { guion: GuionFabrica | null; videos: VideoFabrica[]; clips?: number[] }
+export interface ResumenFabrica extends SesionFabrica { videos: VideoFabrica[]; trabajando: boolean }
+/** origen "virales": salio de un video viral de otra cuenta (porque: por que deberia funcionar) */
+export interface IdeaFabrica { tema: string; gancho: string; serie: string; creado: number; porque?: string; origen?: string }
+export const fabrica = {
+  /** banco de temas por nicho: Claude propone, al usar uno sale del banco */
+  ideas: (nicho: string) => pedir<{ ideas: IdeaFabrica[] }>(`/fabrica/ideas?nicho=${encodeURIComponent(nicho)}`),
+  sugerir: (nicho: string, serie = "") =>
+    pedir<{ ideas: IdeaFabrica[] }>(`/fabrica/ideas`, { method: "POST", ...json({ nicho, serie }) }),
+  quitarIdea: (nicho: string, tema: string) =>
+    pedir<{ ideas: IdeaFabrica[] }>(`/fabrica/ideas?nicho=${encodeURIComponent(nicho)}&tema=${encodeURIComponent(tema)}`, { method: "DELETE" }),
+  /** el video ya hecho que mas se parece a un tema (para no repetir) */
+  parecido: (tema: string, nicho: string) =>
+    pedir<{ parecido: { id: string; titulo: string; parecido: number } | null }>(
+      `/fabrica/parecido?tema=${encodeURIComponent(tema)}&nicho=${encodeURIComponent(nicho)}`),
+  catalogo: () => pedir<CatalogoFabrica>(`/fabrica/catalogo`),
+  estilos: () => pedir<GaleriaEstilos>(`/fabrica/estilos`),
+  urlMuestra: (estilo: string, v: number) => `${BASE}/fabrica/estilos/${estilo}/muestra?v=${v}`,
+  listar: () => pedir<{ videos: ResumenFabrica[] }>(`/fabrica`),
+  renombrar: (fid: string, titulo: string) => pedir<SesionFabrica>(`/fabrica/${fid}`, { method: "PATCH", ...json({ titulo }) }),
+  duplicar: (fid: string) => pedir<SesionFabrica>(`/fabrica/${fid}/duplicar`, { method: "POST" }),
+  moldes: () => pedir<{ moldes: MoldeFabrica[] }>(`/fabrica/moldes`),
+  /** guarda las opciones dadas, o las de un video ya hecho (desde = su id) */
+  guardarMolde: (nombre: string, o: { opciones?: Partial<OpcionesFabrica>; desde?: string }) =>
+    pedir<MoldeFabrica>(`/fabrica/moldes`, { method: "POST", ...json({ nombre, ...o }) }),
+  borrarMolde: (mid: string) => pedir<{ ok: boolean }>(`/fabrica/moldes/${mid}`, { method: "DELETE" }),
+  /** saga: video nuevo que continua la historia de este (Dia 1 -> Dia 2) */
+  // Borra la cache de escenas ya dibujadas (se redibujan al rehacer o abrir en el editor).
+  liberar: (fid: string) => pedir<{ liberado: number; total: number; liberable: number }>(`/fabrica/${fid}/liberar`, { method: "POST" }),
+  siguiente: (fid: string, idea = "") => pedir<SesionFabrica>(`/fabrica/${fid}/siguiente`, { method: "POST", ...json({ idea }) }),
+  crear: (o: Partial<OpcionesFabrica> & { tema: string }) => pedir<SesionFabrica>(`/fabrica`, { method: "POST", ...json(o) }),
+  /** varios videos con las mismas opciones; se hacen de uno en uno */
+  lote: (temas: string[], opciones: Partial<OpcionesFabrica>) =>
+    pedir<{ lote: string; videos: SesionFabrica[] }>(`/fabrica/lote`, { method: "POST", ...json({ temas, opciones }) }),
+  /** crea un proyecto del Estudio con este video (voz, escenas y clips) para retocarlo en el editor */
+  abrirEditor: (fid: string, formato?: FormatoFabrica) =>
+    pedir<{ proyecto: string }>(`/fabrica/${fid}/editor`, { method: "POST", ...json({ formato }) }),
+  subirAudio: (archivo: File) => {
+    const fd = new FormData();
+    fd.append("audio", archivo, archivo.name);
+    return pedir<{ voz: string; duracion: number }>(`/fabrica/audio`, { method: "POST", body: fd });
+  },
+  ver: (fid: string) => pedir<DetalleFabrica>(`/fabrica/${fid}`),
+  borrar: (fid: string) => pedir<{ ok: boolean }>(`/fabrica/${fid}`, { method: "DELETE" }),
+  rehacer: (fid: string, desde: "guion" | "voz" | "render", opciones?: Partial<OpcionesFabrica>) =>
+    pedir<SesionFabrica>(`/fabrica/${fid}/rehacer`, { method: "POST", ...json({ desde, opciones }) }),
+  /** sigue un video parado en revision (voz "narrada:<archivo>" = tu grabacion leyendo el guion) */
+  montar: (fid: string, opciones?: Partial<OpcionesFabrica>) =>
+    pedir<SesionFabrica>(`/fabrica/${fid}/montar`, { method: "POST", ...json({ opciones }) }),
+  guardarGuion: (fid: string, guion: GuionFabrica) => pedir<SesionFabrica>(`/fabrica/${fid}/guion`, { method: "PUT", ...json({ guion }) }),
+  /** clip de video hecho aparte (con el video_prompt de la escena) para una escena de ilustracion */
+  subirClip: (fid: string, n: number, archivo: File) => {
+    const fd = new FormData();
+    fd.append("video", archivo, archivo.name);
+    return pedir<{ clips: number[] }>(`/fabrica/${fid}/clip/${n}`, { method: "POST", body: fd });
+  },
+  borrarClip: (fid: string, n: number) => pedir<{ clips: number[] }>(`/fabrica/${fid}/clip/${n}`, { method: "DELETE" }),
+  urlVideo: (fid: string, formato: FormatoFabrica, descargar = false, v = 0) =>
+    `${BASE}/fabrica/${fid}/video/${formato.replace(":", "x")}?v=${v}${descargar ? "&descargar=true" : ""}`,
+};
+
+// Ideas virales: videos de otras cuentas que hacen 3x su mediana (outliers) -> temas propios para el banco.
+export interface VideoViral { id: string; titulo: string; vistas: number; url: string; cuenta: string; veces: number }
+export interface CuentaViral { nombre: string; url: string; seguidores: number | null; mediana: number; n: number }
+export interface AnalisisViral { cuentas: CuentaViral[]; videos: VideoViral[]; errores: string[]; fecha: number; urls: string[]; criterio: string }
+export interface DetalleViral {
+  titulo: string; vistas: number; duracion: number | null; likes: number | null; comentarios: number | null;
+  likes_mil: number | null; comentarios_mil: number | null; gancho: string; descripcion: string;
+  top: { texto: string; likes: number }[];
+}
+export const virales = {
+  ultimo: () => pedir<{ analisis: AnalisisViral | null }>(`/virales`),
+  analizar: (cuentas: string[]) => pedir<AnalisisViral>(`/virales`, { method: "POST", ...json({ cuentas }) }),
+  detalle: (url: string) => pedir<DetalleViral>(`/virales/detalle`, { method: "POST", ...json({ url }) }),
+  aTemas: (videos: (VideoViral & Partial<DetalleViral>)[], nicho: string, serie = "") =>
+    pedir<{ ideas: IdeaFabrica[] }>(`/virales/temas`, { method: "POST", ...json({ videos, nicho, serie }) }),
+};
+
+// Clonar video: de un video que funciona sale su receta (gancho, bloques, tipos de plano, ritmo) para rehacerlo.
+export interface PlanoClon {
+  n: number; desde: number; hasta: number; foto: string | null; texto: string; tipo?: string; describe?: string; texto_pantalla?: string;
+}
+export interface RecetaClon {
+  titulo: string; resumen: string; duracion: number; formato: FormatoFabrica; nicho_sugerido: string;
+  gancho: { texto: string; visual: string; tipo: string; patron: string };
+  por_que_funciona: string[]; temas_parecidos: string[]; efectos: string[]; subtitulos: string; musica: string;
+  estructura: { bloque: string; desde: number; hasta: number; que_pasa: string; patron: string }[];
+  ritmo: { planos: number; cortes_por_minuto: number; plano_medio_s: number }; palabras_por_segundo: number;
+}
+export interface SesionClon {
+  id: string; origen: string; titulo: string; estado: "en cola" | "descargando" | "analizando" | "listo" | "error";
+  progreso: number; mensaje: string; error: string | null; creado: number; duracion?: number; formato?: FormatoFabrica;
+}
+export interface DetalleClon extends SesionClon { receta: RecetaClon | null; planos: PlanoClon[] }
+export const clones = {
+  listar: () => pedir<{ clones: SesionClon[] }>(`/clones`),
+  crear: (url: string) => pedir<SesionClon>(`/clones`, { method: "POST", ...json({ url }) }),
+  subir: (archivo: File) => {
+    const fd = new FormData();
+    fd.append("video", archivo, archivo.name);
+    return pedir<SesionClon>(`/clones/subir`, { method: "POST", body: fd });
+  },
+  ver: (cid: string) => pedir<DetalleClon>(`/clones/${cid}`),
+  borrar: (cid: string) => pedir<{ ok: boolean }>(`/clones/${cid}`, { method: "DELETE" }),
+  urlFoto: (cid: string, nombre: string) => `${BASE}/clones/${cid}/foto/${nombre}`,
+};
+
+// Biblioteca de dibujos de la Fabrica: pegatinas (encima del mapa) e ilustraciones (pantalla completa).
+export type TipoDibujo = "pegatinas" | "ilustraciones";
+export interface Dibujo { id: string; descripcion: string; origen: "base" | "propia"; creado?: number; grupo: string }
+export interface Biblioteca {
+  pegatinas: Dibujo[]; ilustraciones: Dibujo[]; crear: boolean;
+  grupos: { id: string; nombre: string }[]; nichos: Record<string, string[]>; familias: string[];
+}
+export const biblioteca = {
+  listar: () => pedir<Biblioteca>(`/fabrica/biblioteca`),
+  // familia: "madera" (o vacia) es la base; "plano" y "grabado", las de los otros estilos
+  urlImagen: (tipo: TipoDibujo, id: string, v = 0, familia = "") => {
+    const q = new URLSearchParams();
+    if (v) q.set("v", String(v));
+    if (familia && familia !== "madera") q.set("familia", familia);
+    return `${BASE}/fabrica/biblioteca/${tipo}/${id}${q.size ? `?${q}` : ""}`;
+  },
+  crear: (tipo: TipoDibujo, descripcion: string, nombre = "", clase: "personaje" | "objeto" = "personaje", familia = "") =>
+    pedir<Dibujo>(`/fabrica/biblioteca/crear`, { method: "POST", ...json({ tipo, descripcion, nombre, clase, familia }) }),
+  subir: (tipo: TipoDibujo, archivo: File, nombre: string, descripcion = "", fondoVerde = false) => {
+    const fd = new FormData();
+    fd.append("archivo", archivo);
+    fd.append("tipo", tipo);
+    fd.append("nombre", nombre);
+    fd.append("descripcion", descripcion);
+    fd.append("fondo_verde", String(fondoVerde));
+    return pedir<Dibujo>(`/fabrica/biblioteca/subir`, { method: "POST", body: fd });
+  },
+  borrar: (tipo: TipoDibujo, id: string) => pedir<{ ok: boolean }>(`/fabrica/biblioteca/${tipo}/${id}`, { method: "DELETE" }),
+};
+
 // Graficos animados del editor (HyperFrames).
 export interface PlantillaGrafico {
   id: string; nombre: string; dur: number; posicion: string; color?: string; descripcion: string;
