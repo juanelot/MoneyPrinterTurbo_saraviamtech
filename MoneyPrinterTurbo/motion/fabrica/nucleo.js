@@ -11,7 +11,12 @@
   const vertical = H / W > 1.3;
   const cuadrado = !vertical && W / H < 1.3;
   // Zona segura: lo importante va dentro. Abajo quedan los subtitulos y, en vertical, los botones de la app a la derecha.
-  const zona = vertical ? { x: W * 0.07, y: H * 0.13, w: W * 0.8, h: H * 0.54 }
+  // Con presentador (abajo a la derecha) los subtitulos van arriba a la izquierda y el contenido queda entre los dos.
+  const zona = E.presentador
+    ? (vertical ? { x: W * 0.07, y: H * 0.235, w: W * 0.86, h: H * 0.36 }
+      : cuadrado ? { x: W * 0.06, y: H * 0.27, w: W * 0.58, h: H * 0.62 }
+      : { x: W * 0.05, y: H * 0.27, w: W * 0.6, h: H * 0.66 })
+    : vertical ? { x: W * 0.07, y: H * 0.13, w: W * 0.8, h: H * 0.54 }
     : cuadrado ? { x: W * 0.07, y: H * 0.08, w: W * 0.86, h: H * 0.62 }
     : { x: W * 0.06, y: H * 0.08, w: W * 0.88, h: H * 0.64 };
   const pintores = [];
@@ -161,6 +166,7 @@
   const subtitulos = () => {
     const lista = E.subtitulos || [];
     if (!lista.length) return;
+    if (E.presentador) return subtitulosArriba(lista);
     const caja = crear("div", "subs", document.getElementById("root"));
     const tam = corto * (vertical ? 0.068 : 0.062);
     caja.style.cssText += `font-size:${tam}px;top:${H * (vertical ? 0.735 : cuadrado ? 0.8 : 0.83)}px;`;
@@ -185,6 +191,46 @@
         let activa = 0;
         g.forEach((w, j) => { if (t >= w[0] - 0.03) activa = j; });
         html = g.map((w, j) => `<span class="${j === activa ? "sub-activa" : ""}">${escapar(w[2])}</span>`).join(" ");
+      }
+      if (html !== ultimo) {
+        caja.innerHTML = html;
+        ultimo = html;
+      }
+    });
+  };
+
+  // Con presentador: frase entera arriba a la izquierda (hasta ~3 lineas); cada palabra sale en gris claro y se
+  // pone de tinta cuando se dice (en 0,2 s). Bloque normal, no flex: si no las palabras pierden los espacios.
+  const subtitulosArriba = (lista) => {
+    const caja = crear("div", "subs-arriba", document.getElementById("root"));
+    const tam = corto * (vertical ? 0.0575 : 0.042);
+    caja.style.cssText = `position:absolute;z-index:6;left:${W * (vertical ? 0.111 : 0.05)}px;top:${H * (vertical ? 0.102 : 0.07)}px;` +
+      `width:${W * (vertical ? 0.787 : 0.6)}px;font-size:${tam}px;line-height:1.14;font-family:var(--f-subs);font-weight:500;` +
+      `color:var(--tinta);text-align:left;`;
+    const grupos = [];
+    let actual = [];
+    lista.forEach((w, i) => {
+      actual.push(w);
+      const sig = lista[i + 1];
+      if (actual.length >= 9 || (actual.length >= 4 && /[.;:!?…]$/.test(w[2])) || !sig || sig[0] - w[1] > 0.6) {
+        grupos.push(actual);
+        actual = [];
+      }
+    });
+    const gris = "color-mix(in srgb, var(--tinta) 30%, var(--fondo))";
+    let ultimo = "";
+    pintores.push((t) => {
+      let g = null;
+      for (let k = grupos.length - 1; k >= 0; k--) {
+        if (t >= grupos[k][0][0] - 0.05) { g = grupos[k]; break; }
+      }
+      let html = "";
+      if (g && t <= g[g.length - 1][1] + 0.6) {
+        html = g.map((w) => {
+          const x = Math.min(1, Math.max(0, (t - w[0]) / 0.2));
+          const color = x >= 1 ? "var(--tinta)" : x <= 0 ? gris : `color-mix(in srgb, var(--tinta) ${Math.round(30 + 70 * x)}%, var(--fondo))`;
+          return `<span style="color:${color}">${escapar(w[2].replace(/[.]$/, ""))}</span>`;
+        }).join(" ");
       }
       if (html !== ultimo) {
         caja.innerHTML = html;
@@ -252,10 +298,36 @@
       luz.style.cssText += "z-index:9;background:#fff;";
       tl.fromTo(luz, { opacity: 0.8 }, { opacity: 0, duration: 0.3, ease: "power2.out", immediateRender: true }, 0);
     }
+    if (tr === "puntos") tintaPuntos(0, false);
+    if (E.salida === "puntos") tintaPuntos(D - 0.45, true);
     for (const t of E.impactos || []) {
       if (t < 0.4) continue;   // pegado a la entrada no se nota
       tl.to(escena, { keyframes: [{ scale: 1.06, duration: 0.06, ease: "power2.out" }, { scale: 1, duration: 0.3, ease: "power2.inOut" }] }, t);
       tl.to(escena, { x: corto * 0.012, duration: 0.04, repeat: 5, yoyo: true, ease: "none" }, t);
+    }
+  };
+
+  // Cortinilla de puntos de tinta: 13x23 puntos que crecen del centro hacia fuera hasta tapar la pantalla (al final
+  // de una escena, crece = true) y se encogen al empezar la siguiente. 0,45 s cada mitad.
+  const tintaPuntos = (t, crece) => {
+    const cols = vertical ? 13 : 23, filas = vertical ? 23 : 13;
+    const capa = crear("div", "fx-capa", document.getElementById("root"));
+    capa.style.cssText += "z-index:9;";
+    const paso = Math.max(W / cols, H / filas), tam = paso * 1.5;
+    const puntos = [];
+    for (let f = 0; f < filas; f++) {
+      for (let c = 0; c < cols; c++) {
+        const p = crear("div", "", capa);
+        const x = (c + 0.5) * W / cols, y = (f + 0.5) * H / filas;
+        p.style.cssText = `position:absolute;left:${x - tam / 2}px;top:${y - tam / 2}px;width:${tam}px;height:${tam}px;` +
+          `border-radius:50%;background:var(--tinta);transform:scale(${crece ? 0 : 1});`;
+        puntos.push([p, Math.hypot(c - (cols - 1) / 2, f - (filas - 1) / 2)]);
+      }
+    }
+    const lejos = Math.max(...puntos.map((q) => q[1]));
+    for (const [p, d] of puntos) {
+      const r = (crece ? d : lejos - d) / lejos * 0.2;
+      tl.fromTo(p, { scale: crece ? 0 : 1 }, { scale: crece ? 1 : 0, duration: 0.25, ease: crece ? "power2.in" : "power2.out", immediateRender: true }, Math.max(0, t + r));
     }
   };
 
@@ -279,13 +351,16 @@
       } else if (x.tipo === "sello") {
         const el = crear("div", "", root);
         el.textContent = x.texto;
-        el.style.cssText = `position:absolute;z-index:6;left:${W / 2}px;top:${zona.y + zona.h * 0.6}px;white-space:nowrap;` +
-          `font-family:"Montserrat",sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:0.04em;color:#e8312f;` +
-          `border:0.09em solid #e8312f;border-radius:0.12em;padding:0.05em 0.35em;background:rgba(255,255,255,0.88);` +
-          `box-shadow:0 0.1em 0.4em rgba(0,0,0,0.35);`;
-        ajustar(el, zona.w * 0.85, corto * 0.2, corto * 0.12);
+        // con presentador va en el hueco libre de abajo a la izquierda, junto a el (en la zona taparia el titulo o la cifra)
+        const plano = v("sello-fuente");   // el estilo puede pedir su letra y un sello plano (sin fondo ni sombra)
+        el.style.cssText = `position:absolute;z-index:6;white-space:nowrap;` +
+          (E.presentador ? (vertical ? `left:${W * 0.2}px;top:${H * 0.74}px;` : `left:${W * 0.72}px;top:${H * 0.16}px;`) : `left:${W / 2}px;top:${zona.y + zona.h * 0.6}px;`) +
+          `font-family:${plano || '"Montserrat",sans-serif'};font-weight:900;text-transform:uppercase;letter-spacing:0.04em;color:${v("acento") && plano ? v("acento") : "#e8312f"};` +
+          `border:${plano ? "5px" : "0.09em"} solid currentColor;border-radius:0.12em;padding:0.05em 0.35em;` +
+          (plano ? "background:transparent;" : "background:rgba(255,255,255,0.88);box-shadow:0 0.1em 0.4em rgba(0,0,0,0.35);");
+        ajustar(el, E.presentador ? W * 0.3 : zona.w * 0.85, corto * 0.2, corto * (E.presentador ? 0.09 : 0.12));
         gsap.set(el, { xPercent: -50, yPercent: -50 });
-        tl.fromTo(el, { opacity: 0, scale: 2.6, rotation: -4 }, { opacity: 1, scale: 1, rotation: -11, duration: 0.24, ease: "power4.in", immediateRender: true }, a);
+        tl.fromTo(el, { opacity: 0, scale: 2.6, rotation: -4 }, { opacity: 1, scale: 1, rotation: plano ? -6 : -11, duration: 0.24, ease: "power4.in", immediateRender: true }, a);
       } else if (x.tipo === "flecha") {
         // de abajo a la derecha hacia el centro de la zona, con el texto en la cola
         const s = corto * 0.34;
@@ -342,6 +417,7 @@
       ritmo();
       extras();
       encima();
+      if (window.F.presentador) window.F.presentador();
       subtitulos();
       acabado();
       tl.set({}, {}, D);  // que la linea de tiempo dure toda la escena

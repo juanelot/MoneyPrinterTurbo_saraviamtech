@@ -8,8 +8,13 @@ Clip Studio: de un video largo (podcast, entrevista, directo) a shorts.
      de frase completa a frase completa: propuestas.json. Los largos se leen por
      ventanas y se quedan los de mejor nota.
   4. Cada clip se exporta en vertical (9:16): recorte por donde diga `encuadre_x`
-     (0 izquierda, 1 derecha) o el video entero sobre un fondo desenfocado, con
-     subtitulos palabra por palabra y, si se quiere, el gancho arriba.
+     (0 izquierda, 1 derecha), el video entero sobre un fondo desenfocado o
+     "documental" (para videos sin rostro: el dibujo grande en el centro, el gancho
+     arriba y los subtitulos debajo), con subtitulos palabra por palabra.
+     `banda` (0-0.35) quita abajo los subtitulos que el original ya trae grabados.
+     `broll` ("" todo del video | pexels | banco | ambos): Claude (haiku, una llamada corta)
+     elige frases que ganan con un plano de otra fuente (que buscar en Pexels o un clip de
+     los bancos de la Fabrica) y lo pone encima 2-3 s (la voz sigue).
 
 Cada sesion tiene sesion.json con su estado (transcribiendo, listo, proponiendo,
 error) y los trabajos van en hilos: la interfaz consulta el estado.
@@ -25,8 +30,9 @@ import uuid
 
 from loguru import logger
 
-from app.services import claude_cli
-from app.services.estudio import acabado, almacen, medios, voz
+from app.models.schema import VideoAspect
+from app.services import claude_cli, material
+from app.services.estudio import acabado, almacen, banco, medios, voz
 from app.utils import utils
 
 EXTENSIONES = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"}
@@ -34,7 +40,14 @@ FRASE_MAX_PALABRAS = 22
 PAUSA_FRASE_S = 0.7
 VENTANA_FRASES = 260   # frases por llamada a Claude en videos largos
 DURACIONES = {"corto": (15, 35), "medio": (30, 60), "largo": (55, 90)}
-VERSION_EXPORT = 1
+VERSION_EXPORT = 2
+ENCUADRES = ("recortar", "ajustar", "documental")
+BROLL_CADA_S = 12   # un plano de B-roll cada tantos segundos de short (maximo BROLL_MAX)
+BROLL_MAX = 4
+BROLL_MODOS = ("pexels", "banco", "ambos")   # "" = todo del video
+BROLL_BANCO_MAX = 80   # clips del banco que se le ensenan a Claude (menos tokens)
+BROLL_DUR = (2.0, 3.2)
+DOC_ANCHO = 0.80   # documental: parte del ancho del original que se ve (un poco de zoom, casi todo el dibujo)
 _candado = threading.RLock()
 _trabajos = {}         # cid -> hilo vivo
 
@@ -211,7 +224,8 @@ def _proponer(cid, cuantos, duracion, pedido):
             "arranque que enganche y un final que cierre la idea. Evita saludos, despedidas y relleno.\n"
             + (f"Pedido: {pedido}\n" if pedido else "")
             + "Cada momento va de la frase [desde] a la frase [hasta] (incluidas). Da un titulo corto y un gancho para "
-            f"poner en pantalla (hasta 8 palabras), los dos en {idioma} (el idioma del video), una nota de 1 a 10 de "
+            f"poner en pantalla (hasta 8 palabras), los dos en {idioma.upper()} (el idioma del video, aunque estas "
+            "instrucciones esten en espanol), una nota de 1 a 10 de "
             "potencial viral y el motivo en una frase en espanol.\n"
             f"{texto}\n"
             'Responde SOLO con una lista JSON: [{"desde": 0, "hasta": 5, "titulo": "...", "gancho": "...", "nota": 8, "motivo": "..."}]'
@@ -281,15 +295,19 @@ def guardar_propuestas(cid, propuestas):
 # ------------------------------------------------------------------ exportar
 
 def exportar(cid, opciones):
-    """Lanza el short de un tramo. opciones: inicio, fin, encuadre ("recortar"|"ajustar"), encuadre_x (0-1),
-    subtitulos (bool), gancho (texto arriba), titulo (nombre)."""
+    """Lanza el short de un tramo. opciones: inicio, fin, encuadre ("recortar"|"ajustar"|"documental"), encuadre_x (0-1),
+    banda (0-0.35: alto de los subtitulos grabados del original que se quitan), subtitulos (bool), gancho (texto arriba),
+    titulo (nombre)."""
     s = _leer(cid)
     a, b = float(opciones["inicio"]), float(opciones["fin"])
     if not (0 <= a < b <= s["duracion"] + 0.5) or b - a < 1 or b - a > 180:
         raise ValueError("el tramo debe durar entre 1 s y 3 min")
-    o = {"inicio": round(a, 2), "fin": round(b, 2), "encuadre": "ajustar" if opciones.get("encuadre") == "ajustar" else "recortar",
+    o = {"inicio": round(a, 2), "fin": round(b, 2),
+         "encuadre": opciones.get("encuadre") if opciones.get("encuadre") in ENCUADRES else "recortar",
+         "banda": round(min(0.35, max(0.0, float(opciones.get("banda") or 0))), 3),
          "encuadre_x": round(min(1.0, max(0.0, float(opciones.get("encuadre_x", 0.5)))), 3),
-         "subtitulos": bool(opciones.get("subtitulos", True)), "gancho": str(opciones.get("gancho") or "").strip()[:80],
+         "subtitulos": bool(opciones.get("subtitulos", True)), "broll": "pexels" if opciones.get("broll") is True else opciones.get("broll") if opciones.get("broll") in BROLL_MODOS else "",
+         "bancos": [x for x in (opciones.get("bancos") or []) if re.fullmatch(r"[0-9a-f]{12}", str(x))][:3], "gancho": str(opciones.get("gancho") or "").strip()[:80],
          "titulo": str(opciones.get("titulo") or "").strip()[:100], "color": str(opciones.get("color") or "#FFD447")[:7]}
     huella = hashlib.sha1(json.dumps([VERSION_EXPORT, s["original"], o], sort_keys=True).encode()).hexdigest()[:16]
     _guardar(cid, estado="exportando", progreso=1, mensaje="preparando el short", error=None)
@@ -297,12 +315,13 @@ def exportar(cid, opciones):
     return {"archivo": f"{huella}.mp4"}
 
 
-def _ass(palabras, a, b, w, h, gancho, color):
-    """Subtitulos palabra por palabra (de 3 en 3, la que suena resaltada) y el gancho arriba."""
+def _ass(palabras, a, b, w, h, gancho, color, abajo=0.2):
+    """Subtitulos palabra por palabra (de 3 en 3, la que suena resaltada) y el gancho arriba.
+    abajo: distancia del borde inferior a los subtitulos (parte del alto)."""
     fuente = acabado.familia_fuente("STHeitiMedium.ttc")
     tam = int(h * 0.045)
     estilos = [
-        f"Style: Sub,{fuente},{tam},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,{max(3, tam // 12)},2,2,60,60,{int(h * 0.2)},1",
+        f"Style: Sub,{fuente},{tam},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,{max(3, tam // 12)},2,2,60,60,{int(h * abajo)},1",
         f"Style: Gancho,{fuente},{int(tam * 1.05)},&H00FFFFFF,&H000000FF,&H50000000,&H80000000,-1,0,0,0,100,100,0,0,3,{max(8, tam // 5)},0,8,70,70,{int(h * 0.1)},1",
     ]
     resalte = acabado._color_ass(color)
@@ -320,6 +339,80 @@ def _ass(palabras, a, b, w, h, gancho, color):
     return acabado.cabecera(w, h, estilos) + "\n".join(lineas) + "\n"
 
 
+def _plan_broll(cid, a, b, modo, bancos):
+    """[{t, d, buscar | clip}] en tiempo del short: frases del tramo que ganan con un plano de otra fuente
+    (Pexels: que buscar; banco: el clip 'k-n' de banco.para_guion que pega con la frase)."""
+    frases = [f for f in almacen.leer_json(_dir(cid, "frases.json"), []) if f[0] >= a - 0.2 and f[1] <= b + 0.3]
+    if len(frases) < 3:
+        return []
+    n = max(1, min(BROLL_MAX, int((b - a) // BROLL_CADA_S)))
+    filas = []
+    for k, bid in enumerate(bancos if modo != "pexels" else [], 1):
+        try:
+            filas += [f"{k}-{c['n']}: {c['describe']}" for c in almacen.leer_json(banco._dir(bid, "clips.json"), []) or []
+                      if c.get("sirve", True) and c.get("describe")]
+        except ValueError:
+            continue
+    if len(filas) > BROLL_BANCO_MAX:   # menos tokens: una muestra repartida
+        filas = [filas[round(i * (len(filas) - 1) / (BROLL_BANCO_MAX - 1))] for i in range(BROLL_BANCO_MAX)]
+    if modo == "banco" and not filas:
+        return []
+    pexels = modo in ("pexels", "ambos")
+    como = ('"buscar": 2-3 palabras EN INGLES para buscar en Pexels (algo que se pueda filmar: nada abstracto ni nombres '
+            'propios)' if pexels else "")
+    if filas:
+        como = (como + (" o, si uno pega mejor, " if pexels else "")
+                + '"clip": el id de uno de estos clips (que pegue con la frase: accion, emocion o cosa; sin repetir):\n'
+                + "\n".join(filas))
+    prompt = (f"Editor de shorts. Elige hasta {n} frases de este clip que ganen con un plano de B-roll (otro video que "
+              "ilustra lo que se dice: un objeto, un lugar, una accion concreta). Nunca la [0] ni la ultima. Para cada una "
+              f"da {como}\nFRASES DEL CLIP:\n" + "\n".join(f"[{k}] {f[2]}" for k, f in enumerate(frases))
+              + "\nResponde SOLO JSON: [" + ('{"frase": 2, "buscar": "oil barrels"}' if pexels else '{"frase": 2, "clip": "1-14"}') + "]")
+    lista = claude_cli.extraer_json(claude_cli.ejecutar(prompt, modelo="haiku", esfuerzo="low", tiempo_max_s=120))
+    pedidos = {}
+    for x in lista if isinstance(lista, list) else []:
+        try:
+            k = int(x["frase"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        clip = banco.resolver(bancos, x.get("clip")) if filas and x.get("clip") else None
+        buscar = str(x.get("buscar") or "").strip()[:40] if pexels else ""
+        if 0 < k < len(frases) - 1 and (clip or buscar):
+            pedidos[k] = {"clip": list(clip)} if clip else {"buscar": buscar}
+    plan, fin_prev = [], -1.0
+    for k in sorted(pedidos):
+        t = max(0.0, frases[k][0] - a)
+        d = min(BROLL_DUR[1], max(BROLL_DUR[0], frases[k][1] - frases[k][0] + 0.3))
+        if t >= fin_prev + 1.5 and t + d < b - a - 1:   # sin pisarse y nunca al final
+            plan.append({"t": round(t, 2), "d": round(d, 2), **pedidos[k]})
+            fin_prev = t + d
+    return plan[:n]
+
+
+def _bajar_broll(plan, horizontal):
+    """El archivo de cada plano: el clip del banco o un video de Pexels (sin repetir); los que no aparecen se quitan."""
+    usados, listos = set(), []
+    for p in plan:
+        if p.get("clip"):
+            try:
+                ruta = banco.ruta_clip(*p["clip"])
+            except (FileNotFoundError, ValueError):
+                continue
+            if ruta not in usados:
+                usados.add(ruta)
+                listos.append(p | {"archivo": ruta})
+            continue
+        for v in material.search_videos_pexels(p["buscar"], 3, VideoAspect.landscape if horizontal else VideoAspect.portrait):
+            if v.url in usados:
+                continue
+            ruta = material.save_video(v.url)
+            if ruta:
+                usados.add(v.url)
+                listos.append(p | {"archivo": ruta})
+                break
+    return listos
+
+
 def _exportar(cid, o, huella):
     s = _leer(cid)
     carpeta = _dir(cid, "exportados", crear=True)
@@ -328,24 +421,59 @@ def _exportar(cid, o, huella):
         w, h = 1080, 1920
         a, b = o["inicio"], o["fin"]
         partes = []
-        if o["encuadre"] == "ajustar":
-            filtro = (f"[0:v]split=2[f][v];[f]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},boxblur=30:3,"
+        # sin la franja de subtitulos grabados del original (abajo)
+        quitar = f"crop=iw:ih*{1 - o['banda']:.3f}:0:0," if o["banda"] else ""
+        abajo = 0.2
+        caja = (0, 0, w, h)   # donde va el B-roll
+        if o["encuadre"] == "documental":
+            # el dibujo a lo ancho un poco por encima del centro; arriba el gancho, debajo los subtitulos
+            ancho = DOC_ANCHO if s["ancho"] > s["alto"] else 1.0
+            alto_v = min(h * 0.62, w * s["alto"] * (1 - o["banda"]) / max(1, s["ancho"] * ancho))
+            y = int(h * 0.44 - alto_v / 2)
+            alto_v = int(alto_v) // 2 * 2
+            caja = (0, y, w, alto_v)
+            abajo = max(0.08, 1 - (y + alto_v) / h - 0.1)
+            filtro = (f"[0:v]{quitar}split=2[f][v];[f]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},"
+                      f"boxblur=30:3,eq=brightness=-0.12[fondo];"
+                      f"[v]crop=iw*{ancho}:ih:(iw-iw*{ancho})/2:0,scale={w}:{alto_v}:force_original_aspect_ratio=increase,crop={w}:{alto_v}[delante];"
+                      f"[fondo][delante]overlay=(W-w)/2:{y},setsar=1")
+        elif o["encuadre"] == "ajustar":
+            filtro = (f"[0:v]{quitar}split=2[f][v];[f]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},boxblur=30:3,"
                       f"eq=brightness=-0.08[fondo];[v]scale={w}:{h}:force_original_aspect_ratio=decrease[delante];"
                       f"[fondo][delante]overlay=(W-w)/2:(H-h)/2,setsar=1")
         else:
             # Recorte vertical por donde diga encuadre_x (centro del recorte, 0-1).
-            filtro = (f"[0:v]scale=-2:{h},crop='min(iw,ih*9/16)':ih:'(iw-min(iw,ih*9/16))*{o['encuadre_x']}':0,"
+            filtro = (f"[0:v]{quitar}scale=-2:{h},crop='min(iw,ih*9/16)':ih:'(iw-min(iw,ih*9/16))*{o['encuadre_x']}':0,"
                       f"scale={w}:{h},setsar=1")
         if o["subtitulos"] or o["gancho"]:
             palabras = almacen.leer_json(_dir(cid, "palabras.json"), []) if o["subtitulos"] else []
             with open(os.path.join(carpeta, f"{huella}.ass"), "w", encoding="utf-8") as f:
-                f.write(_ass(palabras, a, b, w, h, o["gancho"], o["color"]))
+                f.write(_ass(palabras, a, b, w, h, o["gancho"], o["color"], abajo))
             partes.append(f"subtitles={huella}.ass:fontsdir={acabado._ruta_filtro(utils.font_dir(), carpeta)}")
-        filtro += ("," + ",".join(partes) if partes else "") + "[v]"
+        entradas = []
+        if o["broll"]:
+            _guardar(cid, progreso=5, mensaje="B-roll: Claude elige los planos de otras fuentes")
+            try:
+                rolls = _bajar_broll(_plan_broll(cid, a, b, o["broll"], o["bancos"]), caja[2] > caja[3])
+            except Exception as e:  # noqa: BLE001 -- sin B-roll el short sale igual
+                logger.warning(f"clip studio {cid}: sin B-roll ({e})")
+                rolls = []
+            etiqueta = "base"
+            filtro += "[base]"
+            for k, p in enumerate(rolls, start=1):
+                entradas += ["-t", f"{p['d'] + 0.3:.2f}", "-i", p["archivo"]]
+                filtro += (f";[{k}:v]scale={caja[2]}:{caja[3]}:force_original_aspect_ratio=increase,crop={caja[2]}:{caja[3]},"
+                           f"setsar=1,fps=30,setpts=PTS-STARTPTS+{p['t']:.2f}/TB[b{k}];[{etiqueta}][b{k}]overlay={caja[0]}:{caja[1]}:"
+                           f"enable='between(t,{p['t']:.2f},{p['t'] + p['d']:.2f})':eof_action=pass[o{k}]")
+                etiqueta = f"o{k}"
+            filtro += f";[{etiqueta}]" + (",".join(partes) if partes else "null") + "[v]"
+            almacen.escribir_json(os.path.join(carpeta, f"{huella}.broll.json"), rolls)
+        else:
+            filtro += ("," + ",".join(partes) if partes else "") + "[v]"
         _guardar(cid, progreso=10, mensaje="cortando y encuadrando")
         tmp = os.path.join(carpeta, f"{huella}.tmp.mp4")
         r = medios.correr([medios.ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.3f}", "-to", f"{b:.3f}",
-                           "-i", _dir(cid, s["original"]), "-filter_complex", filtro, "-map", "[v]", "-map", "0:a?",
+                           "-i", _dir(cid, s["original"]), *entradas, "-filter_complex", filtro, "-map", "[v]", "-map", "0:a?",
                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-r", "30",
                            "-c:a", "aac", "-b:a", "160k", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-movflags", "+faststart", tmp],
                           timeout=3600, cwd=carpeta)

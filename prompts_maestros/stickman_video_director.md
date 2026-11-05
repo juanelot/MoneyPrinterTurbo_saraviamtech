@@ -1,17 +1,25 @@
 # Stickman Video Director (prompt maestro)
 
-> Adaptado de https://github.com/kaomei/stickman-video-director (licencia MIT, autor kaomei).
-> Las referencias `references/*.md` que menciona el texto están incluidas más abajo como secciones,
-> con el mismo nombre de archivo. No hace falta leer ningún archivo: todo está en este documento.
+> Adaptado de https://github.com/kaomei/stickman-video-director (licencia MIT, autor kaomei), commit eb4bb37.
+> Solo el modo A (Director: propuesta + prompts para clips). El modo B (Autopilot, renderizador local
+> con Gemini/ElevenLabs) no se incluye. Las referencias `references/*.md` van como secciones abajo.
 
 ## Ajustes para este estudio
 
 - En la primera pregunta (setup gate), además de formato, duración y estilo, pregunta el **idioma de la narración**
   (por defecto inglés, como el original). Si es otro idioma, escribe la narración y el bloque de voz en ese idioma
   y conserva la traducción de referencia en el idioma de la persona. Los prompts visuales siguen en inglés.
-- Los clips se generan a mano en Google Flow (Gemini Omni Flash / Veo). Cada clip dura ~10 s = 1 escena.
+- Los clips se generan en Google Flow (Gemini Omni Flash / Veo). Estilos 1–5: cada clip dura ~10 s = 1 escena.
 - La narración de cada clip es la narración de esa escena (la app la usa para la voz y para alinear escenas).
+- **Estilo 6 (A6 · Amber Noir)**: clips de Veo 3.1 Fast de **máximo 8 s**, cada uno a partir de una imagen de
+  primer fotograma (Nano Banana en Flow). Por cada escena entrega: narración exacta, prompt de imagen de primer
+  fotograma completo (estilo + reparto + mundo + composición + restricciones) y un prompt de movimiento corto
+  (actor que NO habla, sin texto de narración). La voz NO es Gemini Puck: la pone el estudio (voz Microsoft o la
+  grabación del usuario) y los subtítulos/títulos los añade el estudio al renderizar. No hay ruta Renoise.
+  Imágenes de estilo de muestra en `prompts_maestros/stickman_a6_referencias/` (solo estilo, no reparto).
 
+
+---
 
 # Directing Stickman Videos
 
@@ -33,7 +41,8 @@ Require these before planning:
     - `Style 2B (Cinematic Story)`: full-color narrative environments, cinematic lighting & depth
   - `Style 3 (Prehistoric Hand-Drawn / Dark Comedy)`: expressive white filled heads, black stick limbs, animal-hide costumes and earthy prehistoric settings; story-specific casting
   - `Style 4 (Cozy Storytelling / 治愈故事风)`: expressive minimalist white-filled characters with dark stick limbs in full-color 2D cartoon environments; varied story locations and cinematic shot changes
-  - `Style 5 (Historical Cartoon / 历史卡通风)`: white-filled round heads, simple black oval eyes and thin black stick limbs in era-specific costume, with cel shading and full-color painterly historical settings
+  - `Style 5 (Historical Cartoon / 历史卡通风)`: white heads with connected short white necks, expressive faces, black stick limbs and compact fingerless palms, period dress and cel-shaded historical settings
+  - `Style 6 (A6 · Amber Noir / 暖金暗影风)`: matte-black round heads with connected short black necks, cream-white eye marks, amber light and deep plum shadows in layered illustrated settings; image-first Veo clips of at most 8 s (see the A6 section at the end; it bypasses the A1–A5 contract)
 
 If aspect ratio or visual style is missing, ask for all missing items in one concise message and stop. If duration is omitted, default to 60 seconds (6 clips). If a user provides a duration not divisible by 10, round to the nearest 10-second multiple. If a user specifies only light or dark theme, default to Style 1. Never select an aspect ratio or style silently. Do not re-ask choices already supplied.
 
@@ -115,7 +124,7 @@ This catalog defines the supported visual styles for `directing-stickman-videos`
 | **Style 2B** | Modern Beanie - Cinematic Story (彩色故事风) | Full-color narrative environments, cinematic lighting & depth (warm room, dusk, desert, summit) | Emotional storytelling, personal growth, motivational journeys, narrative hooks | Same red beanie & yellow t-shirt figure staged inside rich environmental lighting |
 | **Style 3** | Prehistoric Hand-Drawn / Dark Comedy (史前手绘 / 黑色幽默) | Earthy prehistoric environments, warm fire accents, subtle paper texture | Satirical stories, visual analogies, ironic callbacks | White filled heads, expressive cartoon faces, black stick limbs, variable story-specific cast |
 | **Style 4** | Cozy Storytelling (治愈故事风) | Full-color 2D cartoon locations, gentle atmospheric light, varied cinematic shots | Relatable life stories, emotional growth, educational storytelling | White filled round head and slim torso, dark stick limbs, simple expressive face |
-| **Style 5** | Historical Cartoon (历史卡通风) | Full-color painterly historical settings, clean cel shading, era-specific wardrobe and props | History explainers, historical daily life, civilization stories and historical comedy | White filled round heads, simple black oval eyes, thick outlines and thin black stick limbs |
+| **Style 5** | Historical Cartoon (历史卡通风) | Full-color painterly historical settings, clean cel shading, era-specific wardrobe and props | History explainers, historical daily life, civilization stories and historical comedy | White filled round heads with connected short white necks, expressive individual faces, solid black oval eyes, thin black exposed limbs and small solid black mitten-shaped palms continuous with the wrists, one subtle integrated thumb lobe, no individual fingers, finger separations, white fills or gloves |
 
 For Style 3 read `prehistoric-dark-comedy.md`. It overrides this catalog's generic motion and piano rules. Fix the drawing grammar across stories, not one universal face; fix each approved character within a story.
 
@@ -437,6 +446,8 @@ Do not include final model prompts. A global change invalidates approval and req
 
 # Shared voice continuity — all visual styles
 
+Scope: **A · Director text-to-video prompts only**. B · Autopilot uses named TTS voices under `autopilot.md`; do not copy this document's descriptive voice profiles into any B-style TTS request.
+
 This is the common voice contract for Style 1 Light/Dark, Style 2A, Style 2B and Style 3, plus Style 4 Cozy Storytelling. Voice identity belongs to the video, not to a visual style or a clip. Different videos may choose different voices; every clip of one video must use the same complete approved voice profile. Do not force every project into the tested male profile.
 
 ## Choose once in Phase A
@@ -601,6 +612,8 @@ The 2026-10-14 Flow samples support the location-change approach and show the in
 
 Historical explainers, daily life, civilization stories and comic historical shorts, using expressive stick figures in colorful historical worlds.
 
+On A5 selection, read **A5 proactive character guidance** in first-use guidance. Remind users to generate their own front/side/back character views and attach their confirmed references with the complete prompt for every clip in a supporting tool. This is advice only: do not supply or automatically generate reference images, or make them a delivery gate. Additional reference work needs an explicit user request. Users can knowingly choose text-only; references help but do not guarantee consistency.
+
 Visual concept and Roman era-pack contribution: [Lawal Ridwan / @leksautomate](https://github.com/leksautomate), via [History Stickman](https://github.com/kaomei/stickman-video-director/pull/41). Adapted to this project's Style 5 with owner-directed cross-era trials. The contributor's PR numbering is not the published style number.
 
 ## Fixed drawing grammar
@@ -608,10 +621,19 @@ Visual concept and Roman era-pack contribution: [Lawal Ridwan / @leksautomate](h
 Repeat this anchor verbatim in every standalone prompt:
 
 ```text
-Polished 2D cel-shaded cartoon animation with thick clean black outlines and soft metallic shading. Stick-figure characters with smooth white filled round heads, simple black oval eyes, expressive brows and mouths, no nose, and thin black stick limbs, in the described costume. Exactly two arms and two legs, each shown only in its current pose. Clean, sunlit, painterly landscapes.
+CHARACTER: A 2D cartoon man with a round white head and a short, sturdy white neck growing naturally from his clothed shoulders and supporting his jaw. The white head and neck form one continuous filled silhouette. The lower jaw flows directly into the short white neck; the bottom of that neck enters the tunic neckline. The visible connection is white, with black outlines only along its two sides. Keep this white connection visible during walking, turns, tilts and camera cuts. Use balanced adult stickman proportions rather than a big-headed chibi: the complete standing figure is roughly four head-heights tall, the round head is visibly narrower than the clothed shoulder span, the torso is slightly longer than the head, and the thin black legs provide a natural lower-body length. The exposed neck is short, about one tenth of the head diameter tall. Thin black arms and legs, exactly two of each. Polished 2D cel-shaded historical cartoon, clean thick black outlines, softly shaded period clothing, and sunlit painterly surroundings.
+FACE: An appealing, expressive storybook-cartoon face on the round white head. Two solid black vertical oval eyes; character-specific eyebrows, nose and mouth defined in the cast card, not a universal template face. Subtle cheek shading gives the face warmth without realistic skin texture. Expressions react to the action while the eye shape, nose shape, face proportions and identity remain unchanged. Hair and facial hair, when present in the cast, have a few clearly shaped locks and soft cel shading, not flat featureless patches. Keep this readable cartoon richness, not a blank symbolic face, photorealism or detailed irises.
+PALMS: Each thin black wrist ends in one compact, solid black rounded oval palm with a subtle integrated thumb bump. Use the same palm-to-head proportion in both hands and all shots: total palm silhouette about 18% of head diameter long and 10% wide, including the thumb bump. It is visibly wider than the wrist, neither a wrist-tip dot nor an enlarged glove. No separate fingers, finger lines or white fill. The empty indicating gesture keeps this compact silhouette; change the arm angle instead of spreading or enlarging the palm.
+EXPOSED LIMBS: Every uncovered arm, forearm, wrist and shin is one slender solid black stroke. Face and short neck use white fill; the limbs use solid black strokes. Preserve the character proportions and costume colors throughout.
 ```
 
 Keep white head fill, head/body proportions, outline weight and black stick limbs fixed within a story. Open eyes are simple solid black ovals without iris/pupil detail; a blink or closed-eye expression does not redesign the eyes. Cloth, leather and metal can have soft shading and small highlights. Backgrounds are full-color painted landscapes or architecture, not empty white canvases, paper textures, ink wash, photorealistic people or glossy 3D characters. Approved night/interior lighting changes illumination, not drawing grammar. Costume may cover limbs without changing their underlying black line design.
+
+Use this owner-selected baseline rather than stacking earlier experimental anatomy recipes. Resolve character gender/age and garment wording once in Phase A when the story requires a different cast; freeze the resulting full anchor across clips. Preserve the continuous white jaw–short-neck–garment connection in every view, not direct head-to-collar contact or a floating head. Do not treat a background-colored gap or an exposed chest panel as a neck. Hair, beard and collar may overlap but must not conceal a detached head. Keep the approved compact neck and adult proportions; do not copy one reference character's hair or costume to unrelated eras. This connection rule is A5-only. The baseline is a design target, not evidence of reliable text-only generation.
+
+Freeze an individual face, not one national template: choose era-appropriate hair, eyebrows and expressions for the particular role without implying everyone from that country looks alike. A nose can be one short shallow black curve on the white face, smaller than half an eye's height; keep it flat, not a projecting bridge or skin-colored blob. Expressions can change with the story while identity stays fixed. If the cast calls for hair, name it explicitly and check that it is actually visible; a bald output fails that cast even when the prompt mentions hair.
+
+The thin-black-limb rule includes exposed arm and leg segments, not sleeves or footwear. Hands use the owner's rounded black palm silhouette: a compact mitten-shaped palm visibly wider than the wrist, with one small rounded side thumb lobe and one undivided rounded finger mass. This is a single solid silhouette, not an anatomical hand, a tiny circular end cap or a white glove. No individual fingers, branching digit strokes, finger separations, digit lines or nails. Each palm attaches continuously to its thin black wrist. Show a grip through contact or overlap between the palm and the prop, supported by the arm pose; show release by moving the palm away. An empty raised hand retains this same compact silhouette without spreading fingers. Sleeves retain the approved fabric silhouette and color. Grips, releases and gestures may change pose, but keep hand scale and shape consistent across shots; avoid oversized black fists or glove-like blobs. Fixed hand design means consistent rendering, not frozen poses or permanently clenched fists. This clarification is A5-only; it does not change any A1–A4 or B-style anatomy rules.
 
 ## Phase A: era and cast
 
@@ -627,14 +649,14 @@ Use the existing proposal and approval workflow. Include a compact era pack:
 
 For a different era, draft and confirm a new pack rather than borrowing Roman armor or symbols. Adapt Egyptian, Chinese, Japanese or other clothing and buildings while preserving the drawing grammar. Do not make one Roman soldier a universal cast for all stories.
 
-For each recurring role, write a complete story-specific cast card: role/age range, head/body proportions, face and eye shape, hair/beard or explicit absence, headwear, clothing layers and silhouette, limb treatment, footwear and distinguishing accessory. Give recurring roles at least two visible non-color differences. Resolve concrete features instead of writing only “a soldier” or “a princess.” Freeze each approved card and repeat its **full description** in every standalone prompt where the role appears; never substitute “same character,” an ellipsis or a name alone. A crowd can use one uniform group description, with named foreground characters separately identified.
+For each recurring role, write a complete story-specific cast card: role/age range, head/body proportions, continuous white jaw–short-neck–garment connection and any beard/collar overlap, face and eye shape, hair/beard or explicit absence, headwear, clothing layers and silhouette, limb treatment, black mitten-palm design with integrated thumb lobe and wrist-to-sleeve attachment, footwear and distinguishing accessory. Give recurring roles at least two visible non-color differences. Resolve concrete features instead of writing only “a soldier” or “a princess.” Freeze each approved card and repeat its **full description** in every standalone prompt where the role appears; never substitute “same character,” an ellipsis or a name alone. A crowd can use one uniform group description, with named foreground characters separately identified.
 
 Keep appearance separate from action: a spade's shape belongs in its prop description; who holds it, in which hand, and whether it touches the ground belong in opening/action/ending states. Do not make all props permanently held or all characters permanently front-facing merely to prevent drift.
 
 ### Roman era pack
 
 - **Place:** Roman Republic/Empire, Mediterranean roads, camps, towns and countryside; specify the period needed by the topic.
-- **Soldier:** bronze-gold helmet with black horsehair crest, grey chainmail, red tunic, brown segmented leather skirt, thin black limbs and a short sword. Include a red shield with a gold icon only when the scene needs it. Officers can use a distinct crest or cape, frozen in their own cast cards.
+- **Soldier:** bronze-gold helmet with black horsehair crest, grey chainmail, red tunic, brown segmented leather skirt, thin black exposed limbs, small solid black mitten-shaped palms continuously attached to the wrists, one subtle integrated thumb lobe, no individual fingers, finger separations, white fills or gloves, and a short sword. Include a red shield with a gold icon only when the scene needs it. Officers can use a distinct crest or cape, frozen in their own cast cards.
 - **Civilian:** cream tunic or toga with a story-specific accessory; approve the complete card rather than treating all civilians as soldiers without helmets.
 - **Settings:** green hills, cypress trees, dusty roads, wooden palisades and camp ditches; Forum, harbor or market architecture when relevant.
 - **Palette:** Roman red, bronze gold, steel grey, grass green, sky blue, earthy tan.
@@ -645,7 +667,7 @@ Keep appearance separate from action: a spade's shape belongs in its prop descri
 
 Each prompt contains:
 
-1. Approved duration/ratio and technical targets.
+1. Approved duration/ratio and technical targets. Explicitly call it a `stickman animated video`, not just an `animated video`; use the actual supported resolution rather than claiming a requested target was delivered.
 2. Full drawing-style anchor, era palette and segment setting.
 3. Full cast cards for every visible recurring role, plus relevant prop designs/counts.
 4. Opening layout, held items, hand/owner and screen direction.
@@ -663,14 +685,16 @@ Keep one current pose per limb. Give prop transfers a clear release, travel and 
 Preserve complete approved style, cast and voice blocks; there is no style-specific character-count cap. Remove conflicting or redundant wording rather than stripping identity details. If an interface rejects the length, report its actual limit before changing approved content.
 
 ```text
-NO VISIBLE TEXT, LETTERS, NUMBERS, SUBTITLES, LOGOS OR WATERMARKS (blank paper or abstract brush strokes only), NO SPEECH BUBBLES, NO BLOOD OR GORE, NO PHOTOREALISTIC FACES, NO 3D CGI, NO PAPER TEXTURE, NO EXTRA LIMBS, NO FUSED OR DUPLICATE HEADS, NO COSTUME CHANGES, NO EXTRA CHARACTERS.
+NO VISIBLE TEXT, LETTERS, NUMBERS, SUBTITLES, LOGOS OR WATERMARKS (blank paper or abstract brush strokes only), NO SPEECH BUBBLES, NO BLOOD OR GORE, NO PHOTOREALISTIC FACES, NO 3D CGI, NO PAPER TEXTURE, NO EXTRA LIMBS, NO FUSED OR DUPLICATE HEADS, NO COSTUME CHANGES, NO EXTRA CHARACTERS, NO INDIVIDUAL FINGERS, NO FINGER SEPARATIONS, NO WHITE HANDS OR GLOVES, NO FLOATING HEAD, NO BACKGROUND GAP BETWEEN HEAD AND NECKLINE.
 ```
 
-Keep negatives compatible with the approved cast: do not ban simple faces, historical clothing or chosen hair/beards. Reference images remain optional when requested and supported; the Roman test used pure text-to-video.
+Keep negatives compatible with the approved cast: do not ban expressive faces, the chosen nose, historical clothing or chosen hair/beards. Proactively remind users about self-generated references as above, rather than offering that advice only when asked. Keep the full prompt intact; only list specific reference files when the user actually supplies them. Never claim an attachment was submitted unless it actually was.
 
 ## Review
 
-Before delivery, compare repeated style/cast/voice blocks and all adjacent prop states. When generation is authorized, inspect actual footage for head fill, eye design, costume silhouette, limbs, prop counts and action joins; listen separately for narrator consistency. Record prompt compliance separately from observed output. Localize changes to Style 5; do not rewrite Styles 1–4.
+At the intended delivery size, check the actual continuous white jaw–short-neck–garment connection, including walking, turns, tilts and camera cuts. A background-colored gap fails even if an earlier prompt or review called the connection natural. Check neck length against the approved reference, not a long white neck or chest panel. Preserve approved head shape and proportions. The owner reference defines the target, not cross-clip stability.
+
+Before delivery, compare repeated style/cast/voice blocks and all adjacent prop states. When generation is authorized, inspect actual footage for head fill, eye design, costume silhouette, limbs, compact black mitten palms and continuous wrist attachment during walking, grips, releases and empty-hand gestures, prop counts and action joins; listen separately for narrator consistency. Check that palms have one subtle rounded thumb lobe, without separate fingers, white fill or gloves, and do not grow into large fists. Record prompt compliance separately from observed output, and state sampling coverage rather than claiming frame-by-frame certification. Earlier round-tip or exposed-neck tests do not validate this revised silhouette; retain their failures as historical observations, not overall stability passes. Localize changes to Style 5; do not rewrite Styles 1–4.
 
 ---
 
@@ -684,7 +708,7 @@ Style 3 (Prehistoric Hand-Drawn / Dark Comedy): read `prehistoric-dark-comedy.md
 
 Style 4 (Cozy Storytelling / 治愈故事风): read `cozy-storytelling.md`. Repeat full character and voice anchors, but give each segment its approved new setting. Describe each scene opening as a recognizable new location, then connect action/prop/screen direction or a named time cut. Do not repeat one global room layout, inherit Style 1's no-face/filled-body bans, or require hand-drawn/paper aesthetics. Keep movable-object appearance separate from initial positions and timed state changes.
 
-Style 5 (Historical Cartoon / 历史卡通风): read `historical-cartoon.md` for its standalone prompt order and overrides. Repeat the full frozen drawing anchor, visible cast cards, approved era pack and complete `voice-continuity.md` voice block in every clip. Keep solid oval eyes and black stick limbs, with historical costume and colored painterly scenery. Do not inherit Style 1's hollow-head/no-face/no-clothes contract or generic piano, three-color, four-device and no-idle requirements. Follow its era score, physical beats and planned cuts; do not shorten approved anchors to meet an arbitrary character budget.
+Style 5 (Historical Cartoon / 历史卡通风): read `historical-cartoon.md` for its standalone prompt order and overrides. Repeat the full frozen drawing anchor, visible cast cards, approved era pack and complete `voice-continuity.md` voice block in every clip. Keep connected short white necks, expressive individual faces, solid oval eyes, thin black exposed limbs and small solid black mitten-shaped palms continuous with the wrists, one subtle integrated thumb lobe, no individual fingers, finger separations, white fills or gloves, with historical costume and colored painterly scenery. Do not inherit Style 1's hollow-head/no-face/no-clothes contract or generic piano, three-color, four-device and no-idle requirements. Follow its era score, physical beats and planned cuts; do not shorten approved anchors to meet an arbitrary character budget.
 
 ## Production package order
 
@@ -815,3 +839,64 @@ Start with prompt-level consistency, rather than immediately routing voice drift
 - Style 2 prompts feature the verified character anchor, BGM continuity lock, and anti-clutter negative constraints.
 - All styles repeat an identical complete voice block per video (or per approved recurring speaker); no unresolved profile fields, abbreviated voice references or contradictory per-scene vocal directions remain. Actual audio acceptance is recorded separately from prompt compliance.
 - Generated scenes contain no visible writing; optional overlay phrases are listed separately for post-production.
+
+---
+
+# references/getting-started.md (solo A)
+
+### Optional A character references
+
+Character references are optional support for stronger visual consistency or a personalized character, not a new setup requirement for all A users. Explain the option in first-use guidance; if the user has not chosen it, continue the ordinary Director workflow without blocking on a three-view sheet or adding an approval gate. This section is A-only; it does not impose a reference workflow on B.
+
+When chosen, help define a character within the selected A style's permitted variations and confirm front, side and back views before delivering final clip prompts. Reuse suitable user-approved references rather than requiring new images. Include the character/reference plan in Phase A; a reference that changes an already approved global design follows the existing proposal-revision rule. Keep fixed style anchors, anatomy and character constraints intact: do not silently override them to copy an incompatible reference. Explain any conflict and resolve it with the user.
+
+At prompt handoff, explain that the user attaches the approved character image(s) as a separate reference input for **every generated clip** when the chosen tool supports reference images. Verify the actual tool's support rather than promising that every platform accepts them. If unsupported, explain the limitation and offer a compatible tool or the unchanged text-prompt path. A reference can help, but is not a consistency guarantee; inspect the resulting clips.
+
+Keep the original validated prompt templates, full style/cast anchors and frozen voice blocks as required by the selected A style. References supplement those prompts, not replace, shorten or globally rewrite them. Personalize only within that style's allowed choices, not by changing a fixed character anchor; do not import B's TTS rules or add a generic character-description block to all A prompts.
+
+### A5 proactive character guidance
+
+When A5 / Style 5 / Historical Cartoon is selected, proactively give this recommendation before planning, even if the user has not asked about consistency. Use the conversation language; do not hide it in a FAQ or wait for a failed generation. For example:
+
+> 使用 A5 时，建议你先自行生成人物三视图（正面、侧面、背面），确认满意后，再做视频。在支持参考图的视频工具里，生成每段视频时，都把角色参考图和该段完整分镜提示词一起提交。只靠文字提示词，人物一致性可能不够稳定；参考图有助于保持形象，但不能保证完全一致。已有满意的角色图可以直接复用。
+
+Explain that this is recommended, not a new mandatory setup or approval gate. If the user prefers text-only or skips character design, briefly acknowledge the consistency limitation and continue the existing Director workflow. Once this choice is known, do not repeatedly ask or repeat the warning at every clip. Suggest three views again only for a new character or a material design change.
+
+The default A5 behavior is advice only: remind the user to generate their own reference images. Do not bundle or supply reference images, automatically generate them, require an upload, or wait for a three-view approval before delivering the ordinary proposal and prompts. Generate or review references only when the user explicitly requests that additional work; that request does not waive the host's generation permissions or cost approval. Reuse suitable approved character images when the user provides them instead of requiring new ones. This A5-specific boundary takes precedence over the general optional-reference help above.
+
+At handoff, retain the full standalone style, cast, action and voice instructions. If references are being used, remind the user to attach their confirmed character image(s) to every clip; name specific files only when actually supplied. A reference is an additional image input, not a replacement for the prompt or permission to change A5's drawing rules. Check the chosen model/mode actually supports character-reference images; do not assume that accepting a first-frame image is the same as supporting a multi-view reference sheet, or force a multi-panel sheet to become the opening shot. Offer a supported reference workflow or the text-only path with its limitation. Do not claim guaranteed identity or stable text-to-video: recent cross-country text-only trials still showed missing hair and disconnected heads despite explicit prompt constraints.
+
+---
+
+# references/amber-noir.md (A6, adaptado)
+
+# A6 · Amber Noir / 暖金暗影风
+
+A Director style with reference-guided illustrated acting, independent narration and local finishing. It is not a B style or a new Skill. These rules apply only to A6; preserve A1–A5 and every B style. Do not load A1–A5's ten-second Omni prompt contract, mandatory four-device/three-beat pacing, always-moving rule or embedded narrator blocks for A6.
+
+## Shared story and visual preparation
+
+1. Reuse the supplied topic/link/script, ratio, duration and narration language. If essential creative choices are missing, ask together; otherwise plan immediately. Thirty- and sixty-second stories use the same narrative planning process. Preserve the requested total runtime; never round it to an Omni ten-second multiple.
+2. Produce the director's proposal: premise, hook, causal progression and payoff; exact narration; story-specific cast and visual reference plan; shot timeline; intended SFX cues. A reaction or deliberate pause is valid acting. Do not force a discussion ending or pack decorative devices into every shot.
+3. Obtain approval of this proposal before generation. Reuse approved narration and design; changes to those or the global brief require scoped reapproval, not automatic regeneration of unrelated accepted shots.
+4. Plan narrative acts separately from generated clips. A Veo 3.1 clip is at most 8 seconds: a 30-second film needs at least four clips and may need more; a 60-second film needs at least eight. Allocate editorial time by story and actual speech, not a fixed six-scene or three-clip recipe. Prepare handles/cuts without speeding narration to fit.
+
+Drawing grammar: compact matte-black round heads, connected short black necks, small cream-white eye marks and a compact line mouth; simplified black hands and limbs with a readable silhouette. Use angular illustrated contours, restrained cel shading, amber illumination and deep plum shadows in layered full-color settings. Keep dimensional lighting without turning the cast into glossy 3D toys or realistic people. The red-orange hood-down hoodie belongs to the current sample character, not every A6 story. Freeze the approved cast's proportions, wardrobe, palette and props within each film; vary locations according to the story rather than reusing one background.
+
+For each shot record: editorial time, location and camera, visible cast, incoming prop/pose state, one clear main action and reaction, outgoing state, first-frame reference, separate VO interval, SFX cues and planned cut. Keep hand/prop contact and screen direction legible. For difficult actions, test a representative shot first within the authorized budget.
+
+## Route 1 · Flow browser (recommended)
+
+- Verify browser-control availability, access to the intended Flow project, supported frame input, selected model/mode, ratio, resolution, duration, output count and current credit quote. Use **Veo 3.1 Fast** as the tested starting point unless the user chooses otherwise; recheck the live interface rather than relying on historical labels or quotas.
+- Let the user complete sign-in, verification or account/billing decisions. Do not request credentials, switch accounts, recharge or upgrade automatically. Existing credits may cover generation; subscription/quota conditions still apply.
+- Attach the approved shot-specific first frame using the supported input. Use a short motion prompt describing the visible action and camera; keep narration text and narrator instructions out. Request a silent non-speaking actor, with only quiet ambience if supported. Verify the entered prompt/settings before one explicit submission; retain the job/result ID and check its state before retrying after an interruption.
+- Review raw results for action, mouth, anatomy, contact and continuity. The actor performs, not presents or recites the story. Keep the mouth a small stable line or slightly open mark without rhythmic speech motion. Offscreen-narrator wording alone did not reliably prevent speaking in earlier tests; separate voiceover is the default, not a proven mouth-stability fix. Do not repaint, mask, replace the mouth or hide the face as a workaround.
+- Export valid clips; the studio assembles them with its own voice and subtitles. If browser control or exporting is unavailable, report the specific limitation and offer user-assisted operation. Do not silently switch providers or call a prompt package a finished film.
+
+## Expand before delivery or submission
+
+Every image prompt must independently describe **style, visible cast, world, composition and constraints**. Repeat complete approved descriptions when needed. Internal labels may help planning, but the outgoing prompt must not contain `[STYLE LOCK]`, `[CAST LOCK]`, `[WORLD LOCK]`, template variables, `TBD`, “same as above”, “same character” or “use previous prompt” instead of those descriptions. An explicit reference input complements the full text; it does not excuse empty fields.
+
+Describe drawing grammar in plain English: matte-black round head, connected short black neck, small cream-white eye marks/compact mouth, simplified black hands and limbs, restrained cel shading, amber light and deep plum shadows, layered illustrated environment. Avoid glossy toy rendering, photoreal people, extra limbs or disconnected anatomy. Keep the story's own clothes, setting and aspect ratio. Titles/captions are added during finishing, not baked into reference illustrations.
+
+Use a separate **short motion prompt** only after a shot-specific first frame exists: one action/reaction and motivated camera move, non-speaking actor, no narrator script. Do not paste a character-sheet prompt or a long full-film screenplay into Veo's motion field. The provider's actual frame/duration limits still apply; narration, captions and titles are added by the studio.

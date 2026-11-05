@@ -45,7 +45,13 @@ export interface DetalleClips extends SesionClips {
   frases: [number, number, string][]; propuestas: MomentoClip[]; exportados: ShortHecho[];
 }
 export interface OpcionesShort {
-  inicio: number; fin: number; encuadre: "recortar" | "ajustar"; encuadre_x: number; subtitulos: boolean;
+  inicio: number; fin: number; encuadre: "recortar" | "ajustar" | "documental"; encuadre_x: number; subtitulos: boolean;
+  /** alto (0-0.35) de los subtitulos grabados del original que se quitan abajo */
+  banda: number;
+  /** planos de otras fuentes encima de algunas frases (Claude elige cuales); "" = todo del video */
+  broll: "" | "pexels" | "banco" | "ambos";
+  /** bancos de clips de la Fabrica para el B-roll (modo banco o ambos) */
+  bancos: string[];
   gancho: string; titulo: string; color: string;
 }
 export const clipStudio = {
@@ -72,10 +78,21 @@ export type EstadoFabrica = "en cola" | "guion" | "voz" | "render" | "montaje" |
 export interface CatalogoFabrica {
   nichos: { id: string; nombre: string; descripcion: string }[];
   series: { id: string; nombre: string; descripcion: string }[];
+  /** personajes que pueden presentar el video (abajo a la derecha, hablando) */
+  presentadores?: { id: string; nombre: string; descripcion: string; propio?: boolean }[];
+  /** motor 3D: si hay Blender en esta maquina y las opciones del muneco */
+  blender?: CatalogoBlender;
   /** aspecto de los dibujos (familias): madera, plano, grabado, foto, acuarela... */
   visuales?: { id: string; nombre: string }[];
   estilos: { id: string; nombre: string; descripcion: string }[];
   formatos: FormatoFabrica[]; falta: string;
+}
+export interface PersonajeBlender { forma: string; color: string; material: string; accesorio: string }
+export interface CatalogoBlender {
+  disponible: boolean; falta: string; personaje: PersonajeBlender;
+  formas: { id: string; nombre: string }[]; materiales: { id: string; nombre: string }[];
+  accesorios: { id: string; nombre: string }[]; escenarios: { id: string; nombre: string }[];
+  calidades: { id: string; nombre: string }[];
 }
 /** voz: de Microsoft, "clon:<id>" o "propia:<archivo>" (grabacion subida con fabrica.subirAudio). musica: "random", "" o una cancion. */
 export interface OpcionesFabrica {
@@ -83,10 +100,16 @@ export interface OpcionesFabrica {
   duracion: number; musica: string; musica_volumen: number; subtitulos: boolean; efectos: boolean; foco?: boolean; nuevos: boolean; idioma: string;
   /** serie de formato (mitos, abuela...) o vacio; marca: nombre del canal para el cierre */
   serie?: string; marca?: string;
+  /** id de catalogo.presentadores o vacio */
+  presentador?: string;
+  /** "blender": todas las escenas son planos 3D del muneco (solo en el PC con Blender) */
+  motor?: "" | "blender"; personaje?: PersonajeBlender; escenario?: string; calidad?: "borrador" | "final";
   /** aspecto de los dibujos: "" = el del estilo, o un id de catalogo.visuales */
   visual?: string;
   /** clonar: id de la receta a seguir; clips: Claude escribe el prompt de video de cada ilustracion (se hacen aparte) */
   receta?: string; clips?: boolean;
+  /** banco de clips: ids de videos del banco cuyos clips Claude pone detras de las ilustraciones; modo: pocos o casi todo */
+  banco?: string[]; banco_modo?: "insertos" | "mayoria";
   /** se para tras el guion y las imagenes (estado "revision") para subir clips, tu voz o la musica; con clips, siempre */
   revisar?: boolean;
 }
@@ -213,6 +236,29 @@ export const clones = {
   urlFoto: (cid: string, nombre: string) => `${BASE}/clones/${cid}/foto/${nombre}`,
 };
 
+// Banco de clips: videos largos cortados en planos de ~3 s que Claude describe; la Fabrica los usa de fondo.
+export interface ClipBanco { n: number; desde: number; dur: number; sirve: boolean; describe?: string; etiquetas?: string[] }
+export interface SesionBanco {
+  id: string; origen: string; titulo: string; estado: "en cola" | "descargando" | "cortando" | "listo" | "error";
+  progreso: number; mensaje: string; error: string | null; creado: number; duracion?: number; n_clips: number;
+}
+export interface DetalleBanco extends SesionBanco { clips: ClipBanco[] }
+export const banco = {
+  listar: () => pedir<{ videos: SesionBanco[] }>(`/banco`),
+  crear: (url: string) => pedir<SesionBanco>(`/banco`, { method: "POST", ...json({ url }) }),
+  subir: (archivo: File) => {
+    const fd = new FormData();
+    fd.append("video", archivo, archivo.name);
+    return pedir<SesionBanco>(`/banco/subir`, { method: "POST", body: fd });
+  },
+  ver: (bid: string) => pedir<DetalleBanco>(`/banco/${bid}`),
+  borrar: (bid: string) => pedir<{ ok: boolean }>(`/banco/${bid}`, { method: "DELETE" }),
+  /** cambia si el clip sirve (los que no sirven no se le ofrecen a Claude) */
+  sirve: (bid: string, n: number) => pedir<{ clips: ClipBanco[] }>(`/banco/${bid}/clip/${n}/sirve`, { method: "POST" }),
+  urlFoto: (bid: string, n: number) => `${BASE}/banco/${bid}/foto/${n}`,
+  urlClip: (bid: string, n: number) => `${BASE}/banco/${bid}/clip/${n}`,
+};
+
 // Biblioteca de dibujos de la Fabrica: pegatinas (encima del mapa) e ilustraciones (pantalla completa).
 export type TipoDibujo = "pegatinas" | "ilustraciones";
 export interface Dibujo { id: string; descripcion: string; origen: "base" | "propia"; creado?: number; grupo: string }
@@ -220,6 +266,43 @@ export interface Biblioteca {
   pegatinas: Dibujo[]; ilustraciones: Dibujo[]; crear: boolean;
   grupos: { id: string; nombre: string }[]; nichos: Record<string, string[]>; familias: string[];
 }
+// Presentadores propios (la Fabrica los anima abajo a la derecha): hechos con Nano Banana desde una descripcion o subidos
+export interface PresentadorPropio {
+  id: string; nombre: string; descripcion: string; creado: number; origen: string;
+  ojos: [number, number][]; boca: [number, number]; ancho_boca: number; piel: string;
+}
+export interface FotoPresentador {
+  id: string; estado: "trabajando" | "listo" | "error"; opciones: number[]; total: number; error?: string;
+}
+export const presentadores = {
+  listar: () => pedir<{ presentadores: PresentadorPropio[]; crear: boolean }>(`/presentadores`),
+  urlImagen: (id: string, v = 0) => `${BASE}/presentadores/${id}/imagen${v ? `?v=${v}` : ""}`,
+  /** tarda ~1 min (Nano Banana en Flow, solo en el PC local) */
+  crear: (nombre: string, descripcion: string) =>
+    pedir<PresentadorPropio>(`/presentadores`, { method: "POST", ...json({ nombre, descripcion }) }),
+  subir: (archivo: File, nombre: string, fondoVerde = false) => {
+    const fd = new FormData();
+    fd.append("archivo", archivo);
+    fd.append("nombre", nombre);
+    fd.append("fondo_verde", String(fondoVerde));
+    return pedir<PresentadorPropio>(`/presentadores/subir`, { method: "POST", body: fd });
+  },
+  /** Nano Banana dibuja 3 opciones con la foto como referencia en segundo plano (~3 min, solo en el PC local) */
+  desdeFoto: (foto: File) => {
+    const fd = new FormData();
+    fd.append("foto", foto);
+    return pedir<FotoPresentador>(`/presentadores/foto`, { method: "POST", body: fd });
+  },
+  estadoFoto: (oid: string) => pedir<FotoPresentador>(`/presentadores/foto/${oid}`),
+  urlOpcion: (oid: string, n: number) => `${BASE}/presentadores/foto/${oid}/${n}`,
+  elegirFoto: (oid: string, opcion: number, nombre: string) =>
+    pedir<PresentadorPropio>(`/presentadores/foto/${oid}/elegir`, { method: "POST", ...json({ opcion, nombre }) }),
+  descartarFoto: (oid: string) => pedir<{ ok: boolean }>(`/presentadores/foto/${oid}`, { method: "DELETE" }),
+  corregir: (id: string, cambios: { ojos?: [number, number][]; boca?: [number, number]; ancho_boca?: number; nombre?: string }) =>
+    pedir<PresentadorPropio>(`/presentadores/${id}`, { method: "PATCH", ...json(cambios) }),
+  borrar: (id: string) => pedir<{ ok: boolean }>(`/presentadores/${id}`, { method: "DELETE" }),
+};
+
 export const biblioteca = {
   listar: () => pedir<Biblioteca>(`/fabrica/biblioteca`),
   // familia: "madera" (o vacia) es la base; "plano" y "grabado", las de los otros estilos

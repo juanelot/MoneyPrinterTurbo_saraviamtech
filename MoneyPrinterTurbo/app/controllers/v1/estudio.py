@@ -14,6 +14,7 @@ import zipfile
 
 from fastapi import Body, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 from app.controllers.v1.base import new_router
 from app.services import claude_cli
@@ -21,7 +22,7 @@ from app.services.estudio import (almacen, asistente, creaciones, grafo, maestro
                                   series, voz_clonada)
 from app.services.estudio import miniatura as portada_video
 from app.services.estudio import (biblioteca, clips, editor, escenas_clip, fabrica, flow_gen, graficos, limpieza, publicar,
-                                  retoques, virales, clonar)
+                                  retoques, virales, clonar, presentadores, banco)
 
 router = new_router()
 router.tags = ["Estudio"]
@@ -640,6 +641,75 @@ def fabrica_biblioteca_borrar(tipo: str, clave: str):
     return {"ok": True}
 
 
+@router.get("/estudio/presentadores", summary="Presentadores propios (hechos con Nano Banana o subidos)")
+def presentadores_listar():
+    return {"presentadores": presentadores.listar(), "crear": flow_gen.habilitado()}
+
+
+@router.get("/estudio/presentadores/{pid}/imagen", summary="Imagen de un presentador propio")
+def presentadores_imagen(pid: str):
+    ruta = presentadores.ruta_imagen(pid)
+    if not ruta:
+        raise HTTPException(404, "ese presentador no existe")
+    return FileResponse(ruta, media_type="image/webp", headers={"Cache-Control": "no-cache"})
+
+
+@router.post("/estudio/presentadores", summary="Crear un presentador desde una descripcion (Nano Banana, solo en el PC con Flow)")
+def presentadores_crear(body: dict = Body(...)):
+    """body: {"nombre", "descripcion"}. Tarda ~1 min."""
+    return _clip(presentadores.crear, body.get("nombre") or "", body.get("descripcion") or "")
+
+
+@router.post("/estudio/presentadores/subir", summary="Subir un presentador ya dibujado (PNG con transparencia o sobre verde)")
+async def presentadores_subir(archivo: UploadFile = File(...), nombre: str = Form(default=""), fondo_verde: bool = Form(default=False)):
+    datos = await archivo.read()
+    if len(datos) > 25 * 1024 * 1024:
+        raise HTTPException(400, "la imagen pesa mas de 25 MB")
+    return _clip(presentadores.subir, datos, nombre, fondo_verde)
+
+
+@router.post("/estudio/presentadores/foto", summary="3 opciones de presentador desde una foto (Nano Banana con referencia, solo en el PC con Flow)")
+async def presentadores_foto(foto: UploadFile = File(...)):
+    """Dibuja en segundo plano (~3 min): se sigue con GET /foto/{id} y se elige una con /foto/{id}/elegir."""
+    datos = await foto.read()
+    if len(datos) > 25 * 1024 * 1024:
+        raise HTTPException(400, "la foto pesa mas de 25 MB")
+    return await run_in_threadpool(_clip, presentadores.desde_foto, datos)
+
+
+@router.get("/estudio/presentadores/foto/{oid}", summary="Como va el dibujo desde foto (estado y opciones hechas)")
+def presentadores_foto_estado(oid: str):
+    return _clip(presentadores.estado_foto, oid)
+
+
+@router.get("/estudio/presentadores/foto/{oid}/{n}", summary="Imagen de una opcion hecha desde foto")
+def presentadores_foto_opcion(oid: str, n: int):
+    ruta = _clip(presentadores.ruta_opcion, oid, n)
+    if not ruta:
+        raise HTTPException(404, "esa opcion no existe")
+    return FileResponse(ruta)
+
+
+@router.post("/estudio/presentadores/foto/{oid}/elegir", summary="Guardar una opcion hecha desde foto como presentador")
+def presentadores_foto_elegir(oid: str, body: dict = Body(...)):
+    return _clip(presentadores.elegir, oid, int(body.get("opcion") or 0), body.get("nombre") or "")
+
+
+@router.delete("/estudio/presentadores/foto/{oid}", summary="Descartar la foto y sus opciones")
+def presentadores_foto_descartar(oid: str):
+    return _clip(presentadores.descartar_foto, oid)
+
+
+@router.patch("/estudio/presentadores/{pid}", summary="Corregir ojos y boca (0-1) o el nombre de un presentador")
+def presentadores_corregir(pid: str, body: dict = Body(...)):
+    return _clip(presentadores.corregir, pid, body.get("ojos"), body.get("boca"), body.get("ancho_boca"), body.get("nombre"))
+
+
+@router.delete("/estudio/presentadores/{pid}", summary="Borrar un presentador propio")
+def presentadores_borrar(pid: str):
+    return _clip(presentadores.borrar, pid)
+
+
 @router.get("/estudio/clones", summary="Videos clonados (recetas)")
 def clones_listar():
     return {"clones": clonar.listar()}
@@ -672,6 +742,50 @@ def clones_borrar(cid: str):
 @router.get("/estudio/clones/{cid}/foto/{nombre}", summary="Fotograma de un plano del video clonado")
 def clones_foto(cid: str, nombre: str):
     return FileResponse(_clip(clonar.ruta_foto, cid, nombre), media_type="image/jpeg")
+
+
+@router.get("/estudio/banco", summary="Banco de clips: videos cortados en planos")
+def banco_listar():
+    return {"videos": banco.listar()}
+
+
+@router.post("/estudio/banco", summary="Cortar un video en clips desde un enlace (YouTube...)")
+def banco_crear(body: dict = Body(...)):
+    return _clip(banco.crear, str(body.get("url") or ""))
+
+
+@router.post("/estudio/banco/subir", summary="Cortar un video subido en clips")
+async def banco_subir(video: UploadFile = File(...)):
+    datos = await video.read()
+    if len(datos) > 4 * 1024 * 1024 * 1024:
+        raise HTTPException(400, "el video pesa mas de 4 GB")
+    return _clip(banco.crear, "", datos, video.filename or "")
+
+
+@router.get("/estudio/banco/{bid}", summary="Clips de un video del banco")
+def banco_ver(bid: str):
+    return _clip(banco.ver, bid)
+
+
+@router.delete("/estudio/banco/{bid}", summary="Borrar un video del banco con sus clips")
+def banco_borrar(bid: str):
+    _clip(banco.borrar, bid)
+    return {"ok": True}
+
+
+@router.post("/estudio/banco/{bid}/clip/{n}/sirve", summary="Marcar o desmarcar un clip como que no sirve")
+def banco_sirve(bid: str, n: int):
+    return _clip(banco.quitar_clip, bid, n)
+
+
+@router.get("/estudio/banco/{bid}/foto/{n}", summary="Fotograma de un clip del banco")
+def banco_foto(bid: str, n: int):
+    return FileResponse(_clip(banco.ruta_foto, bid, n), media_type="image/jpeg")
+
+
+@router.get("/estudio/banco/{bid}/clip/{n}", summary="Un clip del banco (mp4 sin audio)")
+def banco_clip(bid: str, n: int):
+    return FileResponse(_clip(banco.ruta_clip, bid, n), media_type="video/mp4")
 
 
 @router.post("/estudio/fabrica/{fid}/clip/{n}", summary="Subir el clip de video de una escena (hecho aparte con su prompt)")

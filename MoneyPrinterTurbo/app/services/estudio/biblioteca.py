@@ -145,7 +145,7 @@ def prompt(tipo, que, clase="personaje", familia=None):
     return (FIGURA if clase == "personaje" else OBJETO).format(que) + FONDO
 
 
-def recortar(img, destino):
+def recortar(img, destino, alto=ALTO_PEGATINA):
     """Quita el fondo verde croma: alfa segun lo verde que es cada pixel y fuera el reflejo verde del borde."""
     rgb = np.asarray(img.convert("RGB")).astype(np.float32)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
@@ -153,15 +153,15 @@ def recortar(img, destino):
     alfa = 1 - np.clip((verdor - 40) / (110 - 40), 0, 1)
     g2 = np.where(verdor > 0, np.maximum(r, b) + np.clip(verdor, 0, None) * 0.15, g)
     rgba = np.dstack([r, np.minimum(g, g2), b, alfa * 255]).clip(0, 255).astype(np.uint8)
-    _guardar_pegatina(Image.fromarray(rgba, "RGBA"), destino)
+    _guardar_pegatina(Image.fromarray(rgba, "RGBA"), destino, alto)
 
 
-def _guardar_pegatina(pic, destino):
+def _guardar_pegatina(pic, destino, alto=ALTO_PEGATINA):
     caja = pic.getchannel("A").point(lambda a: 255 if a > 12 else 0).getbbox()
     if caja:
         pic = pic.crop(caja)
-    if pic.height > ALTO_PEGATINA:
-        pic = pic.resize((round(pic.width * ALTO_PEGATINA / pic.height), ALTO_PEGATINA), Image.LANCZOS)
+    if pic.height > alto:
+        pic = pic.resize((round(pic.width * alto / pic.height), alto), Image.LANCZOS)
     pic.save(destino, "WEBP", quality=88, method=6)
 
 
@@ -327,7 +327,7 @@ def crear(tipo, descripcion, nombre="", clase="personaje", reemplazar=False, fam
     return {"id": clave, "descripcion": descripcion, "origen": "propia"}
 
 
-def _generar(tipo, texto, destino):
+def _generar(tipo, texto, destino, alto=ALTO_PEGATINA):
     """Una imagen con Nano Banana (Flow) guardada en destino: pegatina recortada del verde o ilustracion vertical."""
     if not flow_gen.habilitado():
         raise flow_gen.NoHabilitado("crear con Nano Banana solo funciona en el PC con Flow (aqui puedes subir una imagen)")
@@ -350,7 +350,10 @@ def _generar(tipo, texto, destino):
             raise RuntimeError(f"Nano Banana no pudo hacer el dibujo: {motivo or 'sin respuesta'}")
         os.makedirs(os.path.dirname(destino), exist_ok=True)
         with Image.open(hecha) as img:
-            (recortar if tipo == "pegatinas" else _guardar_ilustracion)(img, destino)
+            if tipo == "pegatinas":
+                recortar(img, destino, alto)
+            else:
+                _guardar_ilustracion(img, destino)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

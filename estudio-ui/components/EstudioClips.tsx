@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Loader2, Play, Plus, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { AvisoError, Segmentado, Tarjeta } from "./ui";
-import { clipStudio, mmss, type DetalleClips, type MomentoClip, type OpcionesShort } from "@/lib/api";
+import { banco, clipStudio, mmss, type DetalleClips, type MomentoClip, type OpcionesShort, type SesionBanco } from "@/lib/api";
 
 const TRABAJANDO = ["transcribiendo", "proponiendo", "exportando"];
 
@@ -133,19 +133,31 @@ export default function EstudioClips({ id }: { id: string }) {
   );
 }
 
-/** El recorte 9:16 sobre el video largo (lo que quedara en el short). */
+const DOC_ANCHO = 0.8; // igual que clips.DOC_ANCHO: lo que se ve del ancho en "documental"
+type Encuadre = { id: string; modo: OpcionesShort["encuadre"]; x: number; banda: number };
+
+/** Lo que quedara en el short sobre el video largo (y la franja de subtitulos grabados que se quita). */
 function Recuadro({ d, momento }: { d: DetalleClips; momento: MomentoClip }) {
-  const [x, setX] = useState(0.5);
+  const [e, setE] = useState<Encuadre | null>(null);
   useEffect(() => {
-    const leer = (e: Event) => { const v = (e as CustomEvent).detail; if (v?.id === momento.id) setX(v.x); };
+    const leer = (ev: Event) => { const v = (ev as CustomEvent<Encuadre>).detail; if (v?.id === momento.id) setE(v); };
     window.addEventListener("clips-encuadre", leer);
     return () => window.removeEventListener("clips-encuadre", leer);
   }, [momento.id]);
-  const ancho = Math.min(1, (d.alto * 9) / 16 / Math.max(1, d.ancho));
-  if (ancho >= 0.999 || x < 0) return null; // video ya vertical, o "entero con fondo desenfocado"
+  if (!e) return null;
+  const ancho = e.modo === "recortar" ? Math.min(1, (d.alto * (1 - e.banda) * 9) / 16 / Math.max(1, d.ancho))
+    : e.modo === "documental" && d.ancho > d.alto ? DOC_ANCHO : 1;
+  const izq = e.modo === "recortar" ? (1 - ancho) * e.x : (1 - ancho) / 2;
+  if (ancho >= 0.999 && !e.banda) return null;
   return (
-    <div className="pointer-events-none absolute inset-y-0 border-2 border-acento shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
-      style={{ left: `${(1 - ancho) * x * 100}%`, width: `${ancho * 100}%` }} />
+    <>
+      <div className="pointer-events-none absolute top-0 border-2 border-acento shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
+        style={{ left: `${izq * 100}%`, width: `${ancho * 100}%`, height: `${(1 - e.banda) * 100}%` }} />
+      {e.banda > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 grid place-items-center border-t-2 border-dashed border-error bg-error/30 text-[10px] font-semibold text-white"
+          style={{ height: `${e.banda * 100}%` }}>se quita</div>
+      )}
+    </>
   );
 }
 
@@ -229,11 +241,30 @@ function bordes(frases: [number, number, string][], cual: "inicio" | "fin") {
   return frases.map((f) => (cual === "inicio" ? Math.max(0, f[0] - 0.15) : f[1] + 0.25));
 }
 
+/** Las opciones del ultimo short de este video (encuadre, franja, B-roll...). */
+function recordado(id: string): Partial<OpcionesShort> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(`clips-opciones-${id}`) || "{}"); } catch { return {}; }
+}
+
 function Momento({ id, d, x, elegido, trabajando, onElegir, onVer, onCambiar, onQuitar, onExportado }: {
   id: string; d: DetalleClips; x: MomentoClip; elegido: boolean; trabajando: boolean;
   onElegir: () => void; onVer: () => void; onCambiar: (c: Partial<MomentoClip>) => void; onQuitar: () => void; onExportado: () => void;
 }) {
-  const [o, setO] = useState<Omit<OpcionesShort, "inicio" | "fin" | "titulo">>({ encuadre: "recortar", encuadre_x: 0.5, subtitulos: true, gancho: x.gancho, color: "#FFD447" });
+  // horizontal: "documental" (se ve casi todo el dibujo); para una cara que habla (podcast) mejor "recortar".
+  // Encuadre, franja y B-roll se recuerdan por video: se eligen una vez y valen para todos sus shorts.
+  const [o, setO] = useState<Omit<OpcionesShort, "inicio" | "fin" | "titulo">>(() => ({
+    encuadre: d.ancho > d.alto ? "documental" : "recortar", encuadre_x: 0.5, banda: 0, broll: "", bancos: [],
+    subtitulos: true, color: "#FFD447", ...recordado(id), gancho: x.gancho }));
+  useEffect(() => {
+    const { encuadre, encuadre_x, banda, broll, bancos, subtitulos, color } = o;
+    localStorage.setItem(`clips-opciones-${id}`, JSON.stringify({ encuadre, encuadre_x, banda, broll, bancos, subtitulos, color }));
+  }, [id, o]);
+  const [listaBancos, setListaBancos] = useState<SesionBanco[]>([]);
+  useEffect(() => {
+    if (elegido && (o.broll === "banco" || o.broll === "ambos") && !listaBancos.length)
+      banco.listar().then((r) => setListaBancos(r.videos.filter((b) => b.estado === "listo"))).catch(() => {});
+  }, [elegido, o.broll, listaBancos.length]);
   const [error, setError] = useState("");
   const dur = x.fin - x.inicio;
   const mover = (cual: "inicio" | "fin", dir: -1 | 1) => {
@@ -247,13 +278,9 @@ function Momento({ id, d, x, elegido, trabajando, onElegir, onVer, onCambiar, on
     const v = Math.round((x[cual] + dt) * 100) / 100;
     if ((cual === "inicio" ? x.fin - v : v - x.inicio) >= 1 && v >= 0 && v <= d.duracion) onCambiar({ [cual]: v });
   };
-  const encuadre = (v: number) => {
-    setO((p) => ({ ...p, encuadre_x: v }));
-    window.dispatchEvent(new CustomEvent("clips-encuadre", { detail: { id: x.id, x: v } }));
-  };
   useEffect(() => {
-    if (elegido) window.dispatchEvent(new CustomEvent("clips-encuadre", { detail: { id: x.id, x: o.encuadre === "recortar" ? o.encuadre_x : -1 } }));
-  }, [elegido, x.id, o.encuadre, o.encuadre_x]);
+    if (elegido) window.dispatchEvent(new CustomEvent<Encuadre>("clips-encuadre", { detail: { id: x.id, modo: o.encuadre, x: o.encuadre_x, banda: o.banda } }));
+  }, [elegido, x.id, o.encuadre, o.encuadre_x, o.banda]);
 
   return (
     <li className={`rounded-2xl border bg-tarjeta p-4 ${elegido ? "border-acento" : "border-linea"}`} onClick={() => !elegido && onElegir()}>
@@ -285,20 +312,50 @@ function Momento({ id, d, x, elegido, trabajando, onElegir, onVer, onCambiar, on
             ))}
           </div>
           <Segmentado valor={o.encuadre} onChange={(v) => setO((p) => ({ ...p, encuadre: v }))}
-            opciones={[{ v: "recortar", t: "Recortar a vertical" }, { v: "ajustar", t: "Entero con fondo desenfocado" }]} />
+            opciones={[{ v: "documental", t: "Documental (dibujo grande)" }, { v: "recortar", t: "Recortar (cara que habla)" }, { v: "ajustar", t: "Entero con fondo desenfocado" }]} />
           {o.encuadre === "recortar" && d.ancho > d.alto && (
             <label className="block text-xs">
               <span className="etiqueta">Que parte se ve (el recuadro sobre el video)</span>
               <input type="range" className="mt-1 w-full accent-[var(--acento)]" min={0} max={1} step={0.01} value={o.encuadre_x}
-                onChange={(e) => encuadre(Number(e.target.value))} />
+                onChange={(e) => setO((p) => ({ ...p, encuadre_x: Number(e.target.value) }))} />
             </label>
           )}
+          <div className="text-xs">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={o.banda > 0} onChange={(e) => setO((p) => ({ ...p, banda: e.target.checked ? 0.2 : 0 }))} />
+              El original ya trae subtitulos grabados abajo (se quitan)
+            </label>
+            {o.banda > 0 && (
+              <label className="mt-1 block">
+                <span className="etiqueta">Alto de la franja que se quita (la roja sobre el video): {Math.round(o.banda * 100)} %</span>
+                <input type="range" className="mt-1 w-full accent-[var(--acento)]" min={0.05} max={0.35} step={0.01} value={o.banda}
+                  onChange={(e) => setO((p) => ({ ...p, banda: Number(e.target.value) }))} />
+              </label>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <label className="flex items-center gap-2"><input type="checkbox" checked={o.subtitulos} onChange={(e) => setO((p) => ({ ...p, subtitulos: e.target.checked }))} /> Subtitulos palabra por palabra</label>
-            <span className="w-full text-xs text-tinta-3">Si el video largo ya trae subtitulos grabados, quitalos aqui para que no salgan dos veces.</span>
             <label className="flex items-center gap-2">Color
               <input type="color" className="h-7 w-10 cursor-pointer rounded border border-linea bg-tarjeta" value={o.color} onChange={(e) => setO((p) => ({ ...p, color: e.target.value }))} />
             </label>
+          </div>
+          <div className="space-y-2 text-xs">
+            <span className="etiqueta">B-roll (Claude elige 1 frase cada ~12 s y encima va 2-3 s otro video que la ilustra; la voz sigue)</span>
+            <Segmentado valor={o.broll} onChange={(v) => setO((p) => ({ ...p, broll: v }))}
+              opciones={[{ v: "", t: "Todo del video" }, { v: "pexels", t: "Pexels" }, { v: "banco", t: "Mis bancos" }, { v: "ambos", t: "Ambos" }]} />
+            {(o.broll === "banco" || o.broll === "ambos") && (
+              listaBancos.length === 0 ? <p className="text-tinta-3">No hay bancos listos: crealos en Fabrica › Banco de clips.</p> : (
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {listaBancos.map((b) => (
+                    <label key={b.id} className="flex items-center gap-1.5" title={`${b.n_clips} clips`}>
+                      <input type="checkbox" checked={o.bancos.includes(b.id)} disabled={!o.bancos.includes(b.id) && o.bancos.length >= 3}
+                        onChange={(e) => setO((p) => ({ ...p, bancos: e.target.checked ? [...p.bancos, b.id] : p.bancos.filter((y) => y !== b.id) }))} />
+                      <span className="max-w-48 truncate">{b.titulo}</span>
+                    </label>
+                  ))}
+                </div>
+              )
+            )}
           </div>
           <input className="campo !py-1.5 text-sm" placeholder="Gancho arriba los primeros 3 s (vacio: sin gancho)" value={o.gancho}
             onChange={(e) => setO((p) => ({ ...p, gancho: e.target.value }))} />

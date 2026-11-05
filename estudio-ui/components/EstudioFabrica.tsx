@@ -29,6 +29,7 @@ export default function EstudioFabrica({ id }: { id: string }) {
   const [formatos, setFormatos] = useState<FormatoFabrica[]>([]);
   const [musica, setMusica] = useState<string | null>(null);
   const [visual, setVisual] = useState<string | null>(null);
+  const [presentador, setPresentador] = useState<string | null>(null);
   const [clipsCambiados, setClipsCambiados] = useState(false);
   const [canciones, setCanciones] = useState<string[]>([]);
   // revision: tu grabacion leyendo el guion (subida con fabrica.subirAudio, se manda como "narrada:<archivo>")
@@ -43,6 +44,7 @@ export default function EstudioFabrica({ id }: { id: string }) {
     setFormatos((f) => (f.length ? f : x.opciones.formatos));
     setMusica((m) => m ?? musicaDe(x.opciones.musica));
     setVisual((v) => v ?? (x.opciones.visual || ""));
+    setPresentador((p) => p ?? (x.opciones.presentador || ""));
   }).catch((e) => setError(String(e.message || e))), [id, cambiado]);
   useEffect(() => { cargar(); fabrica.catalogo().then(setCat).catch(() => {}); }, [cargar]);
   useEffect(() => { listarMusica().then(setCanciones); }, []);
@@ -73,7 +75,8 @@ export default function EstudioFabrica({ id }: { id: string }) {
   if (!d) return <main className="mx-auto max-w-6xl px-4 pt-10"><Loader2 className="animate-spin text-tinta-3" /></main>;
   const version = Math.round(d.actualizado);
   const otrasOpciones = estilo !== d.opciones.estilo || formatos.join() !== d.opciones.formatos.join()
-    || (musica ?? "random") !== musicaDe(d.opciones.musica) || (visual ?? "") !== (d.opciones.visual || "") || clipsCambiados;
+    || (musica ?? "random") !== musicaDe(d.opciones.musica) || (visual ?? "") !== (d.opciones.visual || "")
+    || (presentador ?? "") !== (d.opciones.presentador || "") || clipsCambiados;
   // con una grabacion propia el texto de las escenas es lo que se oye: no se edita
   const grabada = d.opciones.voz.startsWith("propia:");
 
@@ -232,14 +235,19 @@ export default function EstudioFabrica({ id }: { id: string }) {
               <option value="">Las del estilo</option>
               {cat?.visuales?.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
             </select>
+            <p className="etiqueta mb-2 mt-4">Presentador</p>
+            <select className="campo" value={presentador ?? ""} onChange={(e) => setPresentador(e.target.value)}>
+              <option value="">Ninguno</option>
+              {cat?.presentadores?.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+            </select>
             <div className="mt-4 flex flex-wrap gap-2">
               <button className="boton boton-acento" disabled={trabajando || !otrasOpciones}
-                onClick={() => { setClipsCambiados(false); accion(() => fabrica.rehacer(id, "render", { estilo, formatos, musica: musica ?? "random", visual: visual ?? "" })); }}>
+                onClick={() => { setClipsCambiados(false); accion(() => fabrica.rehacer(id, "render", { estilo, formatos, musica: musica ?? "random", visual: visual ?? "", presentador: presentador ?? "" })); }}>
                 <RefreshCw size={14} /> Redibujar
               </button>
               <button className="boton boton-linea" disabled={trabajando}
                 onClick={() => confirm(grabada ? "Claude repartira tu grabacion en escenas otra vez. ¿Seguir?" : "Claude escribira un guion nuevo para el mismo tema. ¿Seguir?")
-                  && accion(() => fabrica.rehacer(id, "guion", { estilo, formatos, musica: musica ?? "random", visual: visual ?? "" }))}>
+                  && accion(() => fabrica.rehacer(id, "guion", { estilo, formatos, musica: musica ?? "random", visual: visual ?? "", presentador: presentador ?? "" }))}>
                 Guion nuevo
               </button>
             </div>

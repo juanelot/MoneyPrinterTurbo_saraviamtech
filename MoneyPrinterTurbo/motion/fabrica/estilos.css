@@ -13,6 +13,10 @@
 @font-face { font-family: "Bebas Neue"; src: url("BebasNeue.ttf"); }
 @font-face { font-family: "Space Mono"; src: url("SpaceMono.ttf"); font-weight: 700; }
 @font-face { font-family: "Orbitron"; src: url("Orbitron.ttf"); font-weight: 400 900; }
+@font-face { font-family: "Anton"; src: url("Anton.ttf"); }
+@font-face { font-family: "Instrument Sans"; src: url("InstrumentSans.ttf"); font-weight: 400 700; }
+@font-face { font-family: "Instrument Serif"; src: url("InstrumentSerif.ttf"); font-style: italic; }
+@font-face { font-family: "JetBrains Mono"; src: url("JetBrainsMono.ttf"); font-weight: 100 800; }
 
 body {
   --f-subs: var(--f-texto); --sombra-titulo: 0 0 0.3em var(--fondo), 0 0 0.6em var(--fondo);
@@ -129,4 +133,29 @@ body {
   --sub-color: #e9ffe6; --sub-resalte: #39ff14; --sub-borde: rgba(0, 0, 0, 0.95);
   --sombra-titulo: 0 0 0.15em rgba(57, 255, 20, 0.7), 0 0 0.5em rgba(57, 255, 20, 0.35);
   --grano: 0.08; --vineta: 0.6; --textura: lineas; --entrada: parpadeo;
+}
+
+/* Explicador: papel crema con grano fino, tinta y un solo rojo; tarjetas con borde de tinta y sombra de puntos
+   (nada de degradados, brillos ni sombras difusas). Va con el presentador y la serie "explicador". */
+[data-estilo="explicador"] {
+  --fondo: #ebe7e1; --fondo-2: #ebe7e1; --tinta: #1e1c1a; --tinta-suave: #8a857e; --acento: #d7372c; --panel: #fbfaf8;
+  --rojo: #d7372c; --azul: #2f5d8a; --verde: #3f7d4e; --amarillo: #e0a92e; --naranja: #d9772b; --morado: #6a4f8a; --gris: #8a857e;
+  --mar: #d9d4cc; --tierra: #f4f1ec; --borde: rgba(30, 28, 26, 0.55); --costa: #8a857e; --pais-alfa: 0.9;
+  --f-titulo: "Anton", Impact, sans-serif; --f-texto: "Instrument Sans", Arial, sans-serif; --f-dato: "Anton", Impact, sans-serif;
+  --f-subs: "Instrument Sans", Arial, sans-serif;
+  --peso-titulo: 400; --mayus: uppercase; --espaciado: 0.005em;
+  --sub-color: #1e1c1a; --sub-resalte: #d7372c; --sub-borde: rgba(251, 250, 248, 0.95);
+  --sombra-titulo: none; --grano: 0.07; --vineta: 0; --entrada: pop; --sello-fuente: "Anton", Impact, sans-serif;
+}
+[data-estilo="explicador"] .acento { font-family: "Instrument Serif", Georgia, serif; font-style: italic; text-transform: none; }
+/* tarjeta: borde de tinta, esquinas de 20 px y sombra de puntos de tinta desplazada abajo a la izquierda */
+[data-estilo="explicador"] .tarjeta, [data-estilo="explicador"] .marca, [data-estilo="explicador"] .indicador {
+  background: transparent; box-shadow: none; border: 3px solid var(--tinta); border-radius: 20px; isolation: isolate;
+}
+[data-estilo="explicador"] .tarjeta::before, [data-estilo="explicador"] .marca::before, [data-estilo="explicador"] .indicador::before {
+  content: ""; position: absolute; inset: -3px; z-index: -2; border-radius: 20px; transform: translate(-13px, 12px);
+  background: radial-gradient(circle, var(--tinta) 1.7px, transparent 2.1px) 0 0 / 8px 8px;
+}
+[data-estilo="explicador"] .tarjeta::after, [data-estilo="explicador"] .marca::after, [data-estilo="explicador"] .indicador::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 17px; background: var(--panel);
 }

@@ -142,7 +142,7 @@ def molde(api, nombre):
 def opciones(args, perfil):
     o = dict(perfil)
     cambios = {
-        "nicho": args.nicho, "serie": args.serie, "marca": args.marca, "estilo": args.estilo, "duracion": args.duracion, "voz": args.voz,
+        "nicho": args.nicho, "serie": args.serie, "marca": args.marca, "presentador": args.presentador, "estilo": args.estilo, "duracion": args.duracion, "voz": args.voz,
         "velocidad": args.velocidad, "musica": args.musica, "musica_volumen": args.musica_volumen,
         "formatos": [f.strip() for f in args.formatos.split(",") if f.strip()] if args.formatos else None,
         "idioma": IDIOMAS.get(args.idioma, args.idioma) if args.idioma else None,
@@ -200,7 +200,8 @@ def main():
                     help="respetar la pausa antes de montar del molde (clips/revisar): sale con REVISION=<id>")
     ap.add_argument("--nicho", help="mapas, datos, curiosidades, finanzas, historia, ciencia, animales, tecnologia, "
                                     "misterios (ver --catalogo)")
-    ap.add_argument("--serie", help="mitos, abuela, estafas, historias, noticias, top (formato fijo; opcional)")
+    ap.add_argument("--serie", help="mitos, abuela, estafas, historias, noticias, explicador, top (formato fijo; opcional)")
+    ap.add_argument("--presentador", help="leo, ana, max o sol: personaje que habla abajo a la derecha (opcional)")
     ap.add_argument("--marca", help="nombre del canal para el cierre (opcional)")
     ap.add_argument("--estilo", help="papel, oscuro, documental, periodico, pizarra, cuaderno, minimal, pop, neon, terminal")
     ap.add_argument("--formatos", help="9:16,16:9,1:1 (coma)")

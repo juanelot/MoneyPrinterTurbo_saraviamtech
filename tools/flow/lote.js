@@ -9,6 +9,7 @@
 //
 //   node lote.js --script escenas/script.json --out recursos/images --aspect 9:16 --model 2
 //                [--solo 3,7,12] [--pasadas-extra 2] [--detener ruta/.detener]
+// Cada escena puede traer "ref_images": [rutas] (imagenes de referencia que se suben a Flow con el prompt).
 //
 // Progreso: una linea JSON por evento en stdout. Codigo de salida: 0 fin normal,
 // 2 detenido, 3 sin sesion, 4 limite de Flow, 1 error.
@@ -136,7 +137,7 @@ async function main() {
         const t0 = Date.now();
         try {
           const s = await abrir();
-          const img = await generarUna(s.page, s.context, `${e.image_prompt.trim()}${SUFIJO}`);
+          const img = await generarUna(s.page, s.context, `${e.image_prompt.trim()}${SUFIJO}`, { referencias: e.ref_images || [] });
           const archivo = guardar(n, img);
           ok.add(n);
           hecha = true;

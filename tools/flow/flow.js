@@ -5,6 +5,8 @@
 //   - exito / fallo por elementos (img[data-media-id], flow-pending-tile, flow-error-tile),
 //     como la extension "AI Content Generator", no por mensajes traducidos.
 // Nada depende del idioma de la web salvo el aviso de cuota/limite (textos.js).
+import crypto from 'node:crypto';
+import path from 'node:path';
 import { chromium } from 'playwright-core';
 import { CDP_PORT, FLOW_URL, ensureChrome } from './chrome.js';
 import { esLimite } from './textos.js';
@@ -17,6 +19,7 @@ export const MODELS = {
 export const ASPECTS = ['16:9', '4:3', '1:1', '3:4', '9:16'];
 
 const SELECT_ALL = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+const huella = (buf) => crypto.createHash('sha1').update(buf).digest('hex');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Errores que no se arreglan reintentando la misma escena: paran el lote.
@@ -150,12 +153,40 @@ function cuadricula(page) {
   }));
 }
 
-async function escribirPrompt(page, texto) {
+// Sube cada imagen por "+ > Cargar contenido multimedia" y la agrega a la instruccion
+// como ingrediente (chip encima del cuadro).
+async function ponerReferencias(page, rutas) {
+  const chips = page.locator('flow-ingredient-chip');
+  for (const ruta of rutas) {
+    const antes = await chips.count();
+    const cargar = page.getByRole('button', { name: /Cargar contenido multimedia|Upload media/i });
+    if (!(await cargar.isVisible().catch(() => false))) {
+      await page.locator('flow-add-menu button.add-menu-trigger').click();
+      await cargar.waitFor({ state: 'visible', timeout: 10000 });
+    }
+    const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 10000 }), cargar.click()]);
+    await fc.setFiles(ruta);
+    // Tras subir queda seleccionada en el panel con el boton "Agregar a la instruccion".
+    const agregar = page.getByRole('button', { name: /Agregar a la instrucci|Add to prompt/i });
+    await agregar.waitFor({ state: 'visible', timeout: 60000 });
+    await agregar.click();
+    for (let i = 0; i < 40 && (await chips.count()) <= antes; i++) await page.waitForTimeout(500);
+    if ((await chips.count()) <= antes) throw new Error(`Flow no agrego la imagen de referencia ${path.basename(ruta)}`);
+    // el chip muestra la imagen cuando termina de subir
+    await page.waitForFunction(() => ![...document.querySelectorAll('flow-ingredient-chip [aria-busy=true]')].length, null, { timeout: 60000 }).catch(() => {});
+  }
+}
+
+async function escribirPrompt(page, texto, referencias = []) {
   await cerrarMenus(page);
   const clear = page.locator('div.top-right-actions button.clear-button');
   if (await clear.isVisible().catch(() => false)) {
     await clear.click();
     await page.waitForTimeout(800);
+  }
+  if (referencias.length) {
+    await ponerReferencias(page, referencias);
+    await cerrarMenus(page);
   }
   const editor = page.locator('div.ProseMirror');
   await editor.click();
@@ -168,18 +199,31 @@ async function escribirPrompt(page, texto) {
 /**
  * Lanza UNA generacion y espera su imagen como la extension: hasta 80 x 1,5 s,
  * y "termino" = hay imagen nueva y 0 teselas pendientes durante 3 s.
+ * referencias: rutas de imagenes que van como ingredientes (p. ej. foto -> caricatura).
  * Devuelve { buffer, tipo }. Lanza Limite, SinSesion o Error (fallo del intento).
  */
-export async function generarUna(page, context, prompt, { sondeos = 80, cadaMs = 1500, estableMs = 3000 } = {}) {
+export async function generarUna(page, context, prompt, { sondeos = 80, cadaMs = 1500, estableMs = 3000, referencias = [] } = {}) {
   exigirSesion(page);
+  await escribirPrompt(page, prompt, referencias);
+  // despues de escribir: las referencias subidas tambien salen en la cuadricula
+  await page.waitForTimeout(referencias.length ? 1500 : 0);
   const antes = await cuadricula(page);
   const vistos = new Set(antes.ids);
-  await escribirPrompt(page, prompt);
+  // Las referencias nunca son el resultado. Si la misma foto se vuelve a subir, Flow reutiliza la anterior (el chip
+  // lleva su id: /image/<id>) y ademas saca en la cuadricula una COPIA nueva, que llega antes que el dibujo: se
+  // descartan por sus bytes, iguales a los de la referencia.
+  const huellas = new Set();
+  for (const src of await page.locator('flow-ingredient-chip img').evaluateAll((ims) => ims.map((i) => i.src))) {
+    const m = src.match(/\/image\/([0-9a-f-]{36})/);
+    if (m) vistos.add(m[1]);
+    const r = await context.request.get(src).catch(() => null);
+    if (r?.ok()) huellas.add(huella(await r.body()));
+  }
   const submit = page.locator('flow-generate-icon-button button[type=submit]');
   await page.waitForFunction((el) => !el.disabled, await submit.elementHandle(), { timeout: 10000 });
   await submit.click();
 
-  let nuevo = null;
+  const nuevos = [];   // ids nuevos por orden de llegada
   let estableDesde = 0;
   for (let i = 0; i < sondeos; i++) {
     await page.waitForTimeout(cadaMs);
@@ -193,22 +237,26 @@ export async function generarUna(page, context, prompt, { sondeos = 80, cadaMs =
       const motivo = ahora.textoErrores.replace(/\s+/g, ' ').trim().slice(0, 200);
       throw new Error(`Flow no pudo generar la imagen${motivo ? `: ${motivo}` : ''}`);
     }
-    nuevo = nuevo || ahora.ids.find((id) => !vistos.has(id)) || null;
-    if (nuevo && !ahora.pendientes) {
+    for (const id of ahora.ids) if (!vistos.has(id) && !nuevos.includes(id)) nuevos.push(id);
+    if (nuevos.length && !ahora.pendientes) {
       estableDesde = estableDesde || Date.now();
       if (Date.now() - estableDesde >= estableMs) break;
     } else {
       estableDesde = 0;
     }
   }
-  if (!nuevo) throw new Error(`No aparecio ninguna imagen en ${Math.round((sondeos * cadaMs) / 1000)} s`);
-
-  const src = await page.locator(`img[data-media-id="${nuevo}"]`).first().getAttribute('src');
-  const res = await context.request.get(src);
-  if (!res.ok()) throw new Error(`Fallo la descarga (${res.status()}) de la imagen ${nuevo}`);
-  const ct = res.headers()['content-type'] || '';
-  const tipo = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpeg';
-  return { buffer: await res.body(), tipo, mediaId: nuevo };
+  // la ultima en llegar que no sea copia de una referencia
+  for (const id of nuevos.reverse()) {
+    const src = await page.locator(`img[data-media-id="${id}"]`).first().getAttribute('src');
+    const res = await context.request.get(src);
+    if (!res.ok()) throw new Error(`Fallo la descarga (${res.status()}) de la imagen ${id}`);
+    const buffer = await res.body();
+    if (huellas.has(huella(buffer))) continue;
+    const ct = res.headers()['content-type'] || '';
+    const tipo = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpeg';
+    return { buffer, tipo, mediaId: id };
+  }
+  throw new Error(`No aparecio ninguna imagen nueva en ${Math.round((sondeos * cadaMs) / 1000)} s`);
 }
 
 export { sleep };
