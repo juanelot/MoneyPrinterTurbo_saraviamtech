@@ -561,9 +561,11 @@ export interface OpcionesAjustes {
 export interface EstadoClaude {
   instalado: boolean; version: string | null; sesion: boolean; email: string | null; plan: string | null;
   metodo: string | null; iniciando: boolean; url_login: string | null; motivo: string | null;
+  token_servidor: boolean;
 }
 export interface EstadoFlowAjustes {
   habilitado: boolean; corriendo: boolean; chrome: boolean | null; sesion: boolean | null; motivo: string | null;
+  disponible: boolean;
 }
 export const ajustes = {
   ver: () => pedir<{ opciones: OpcionesAjustes; claude: EstadoClaude; flow: EstadoFlowAjustes }>("/ajustes"),

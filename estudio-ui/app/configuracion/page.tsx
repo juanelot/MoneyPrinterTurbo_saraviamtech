@@ -112,7 +112,9 @@ export default function Configuracion() {
         ? <Punto color="ok" texto={`Conectado${claude.email ? ` como ${claude.email}` : ""}`} />
         : <Punto color="error" texto="Sin sesion" />;
 
-  const estadoFlow = !flow.habilitado
+  const estadoFlow = !flow.disponible
+    ? <Punto color="gris" texto="No disponible en este equipo" />
+    : !flow.habilitado
     ? <Punto color="gris" texto="Desactivado" />
     : flow.corriendo
       ? <Punto color="ok" texto="Generando imagenes ahora" />
@@ -144,6 +146,9 @@ export default function Configuracion() {
             {claude.version && <> Version {claude.version}.</>}
           </p>
           {claude.motivo && !claude.sesion && <p className="mt-2 text-xs text-tinta-3">{claude.motivo}</p>}
+          {claude.token_servidor ? (
+            <p className="mt-4 text-sm text-tinta-3">En este servidor Claude entra con un token (CLAUDE_CODE_OAUTH_TOKEN). Se cambia en Portainer, no aqui.</p>
+          ) : (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {claude.iniciando ? (
               <>
@@ -164,6 +169,7 @@ export default function Configuracion() {
               </button>
             )}
           </div>
+          )}
           {claude.iniciando && (
             <p className="mt-2 text-xs text-tinta-3">
               Se abre el navegador de este equipo. Si no se abre solo, usa el boton. Esta pagina se actualiza sola al terminar.
@@ -185,6 +191,11 @@ export default function Configuracion() {
         </Tarjeta>
 
         <Tarjeta titulo="Google Flow (Nano Banana)" extra={estadoFlow}>
+          {!flow.disponible ? (
+            <p className="text-sm text-tinta-2">
+              Flow solo funciona en el PC local (necesita Chrome y tu sesion de Google). Aqui no esta instalado: los dibujos nuevos se hacen desde el PC.
+            </p>
+          ) : (<>
           <div className="flex items-start justify-between gap-4">
             <p className="text-sm text-tinta-2">
               Dibuja las imagenes gratis con tu cuenta de Google en un Chrome aparte. Solo en este PC: en el servidor (VPS) dejalo desactivado.
@@ -224,6 +235,7 @@ export default function Configuracion() {
               </Campo>
             </div>
           )}
+          </>)}
         </Tarjeta>
 
         <Tarjeta titulo="Carpetas del servidor">

@@ -147,7 +147,9 @@ def _login_vivo():
 
 def claude_estado():
     salida = {"instalado": False, "version": None, "sesion": False, "email": None,
-              "plan": None, "metodo": None, "iniciando": False, "url_login": None, "motivo": None}
+              "plan": None, "metodo": None, "iniciando": False, "url_login": None, "motivo": None,
+              # En el VPS la sesion es un token del entorno (Portainer): no se conecta/desconecta aqui.
+              "token_servidor": bool(os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"))}
     try:
         claude_cli.localizar()
     except RuntimeError as e:
@@ -185,8 +187,14 @@ def _leer_login(proceso):
                     _login["url"] = m.group(0)
 
 
+def _sin_token():
+    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+        raise RuntimeError("En este servidor Claude usa un token (CLAUDE_CODE_OAUTH_TOKEN): se cambia en Portainer")
+
+
 def claude_conectar():
     """Lanza `claude auth login` (abre el navegador de ESTA maquina). Se sigue con claude_estado()."""
+    _sin_token()
     with _candado:
         if _login_vivo():
             return {"ok": True, "iniciando": True, "url_login": _login["url"]}
@@ -216,6 +224,7 @@ def claude_cancelar_login():
 
 
 def claude_desconectar():
+    _sin_token()
     claude_cancelar_login()
     codigo, texto, err = _claude("auth", "logout")
     if codigo != 0:
@@ -227,7 +236,7 @@ def claude_desconectar():
 
 def flow_estado(comprobar=True):
     salida = {"habilitado": flow_gen.habilitado(), "corriendo": False, "chrome": None,
-              "sesion": None, "motivo": None}
+              "sesion": None, "motivo": None, "disponible": flow_disponible()}
     if not salida["habilitado"]:
         return salida
     salida["corriendo"] = flow_gen.corriendo()
@@ -240,7 +249,14 @@ def flow_estado(comprobar=True):
     return salida
 
 
+def flow_disponible():
+    """Hay generador de Flow instalado en esta maquina (en el VPS no: sin Chrome ni tools/flow)."""
+    return os.path.isfile(os.path.join(flow_gen._dir_flow(), "node_modules", "playwright-core", "package.json"))
+
+
 def flow_conectar():
+    if not flow_disponible():
+        raise RuntimeError("Flow no esta instalado en esta maquina (solo funciona en el PC local)")
     if not flow_gen.habilitado():
         guardar({"estudio_flow_habilitado": True})
     return flow_gen.conectar()
