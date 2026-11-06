@@ -7,9 +7,11 @@ import { Loader2, Scissors, Upload } from "lucide-react";
 import { AvisoError } from "@/components/ui";
 import { clipStudio, mmss, type SesionClips } from "@/lib/api";
 
+import Paginacion, { usePaginas } from "@/components/Paginacion";
 export default function PaginaClips() {
   const router = useRouter();
   const [lista, setLista] = useState<SesionClips[] | null>(null);
+  const paginas = usePaginas(lista, 12);
   const [error, setError] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -59,7 +61,7 @@ export default function PaginaClips() {
         <p className="rounded-2xl border border-dashed border-linea p-10 text-center text-tinta-3">Todavia no hay videos. Sube el primero.</p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {lista.map((s) => (
+          {paginas.items.map((s) => (
             <li key={s.id}>
               <Link href={`/clips/${s.id}`} className="block rounded-2xl border border-linea bg-tarjeta p-4 transition hover:border-tinta-3 hover:shadow-sm">
                 <p className="truncate font-display font-semibold" title={s.titulo}>{s.titulo}</p>
@@ -72,6 +74,7 @@ export default function PaginaClips() {
           ))}
         </ul>
       )}
+      <Paginacion {...paginas} />
     </main>
   );
 }

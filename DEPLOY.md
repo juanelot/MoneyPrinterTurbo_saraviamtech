@@ -18,7 +18,7 @@ cp MoneyPrinterTurbo_saraviamtech/MoneyPrinterTurbo/resource/songs/*.mp3 /root/m
 ```
 
 En `/root/mpt-data/config.toml` verifica:
-- `kie_api_keys`, `pexels_api_keys`, llm keys, etc.
+- `pexels_api_keys`, llm keys, etc.
 - `video_codec = "libx264"` (el VPS no tiene GPU NVENC)
 
 ## 2. Clonar y construir imágenes (en el VPS)
@@ -84,11 +84,6 @@ docker build -t estudio-ui:latest --build-arg MPT_API_URL=http://api:8080 ./estu
 
 Para actualizar, añade `docker service update --force mpt_estudio` a los comandos de arriba.
 
-**Voz clonada (opcional).** El servidor [Clonar-voz](https://github.com/jceronch1/Clonar-voz) conviene tenerlo en una máquina con GPU; en un VPS pequeño y compartido le quita CPU y RAM (~2 GB) al resto de servicios. Hay que tener en cuenta dos cosas:
-- Solo escucha en `127.0.0.1` y no tiene contraseña. Para que el contenedor `api` llegue a él, publícalo detrás de un túnel (Cloudflare Tunnel, Tailscale) o de un proxy con auth básica.
-- Pon su dirección en `config.toml`: `estudio_voz_clonada_url = "https://usuario:clave@voz.tudominio.com"`.
-
-Si la dejas vacía, el Estudio solo ofrece las voces de Microsoft.
 
 ## Notas
 

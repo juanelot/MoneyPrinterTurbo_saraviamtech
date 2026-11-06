@@ -138,6 +138,21 @@
       const paso = Math.max(3, Math.round(corto / 270));
       lineas.style.cssText += `z-index:8;background:repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 ${paso / 2}px, transparent ${paso / 2}px ${paso}px);`;
     }
+    if (v("cabecera") === "si" && E.cabecera) {
+      // Retro TV: tema arriba a la izquierda, puntos de avance en el centro y "03 / 08" a la derecha
+      const cab = crear("div", "fx-capa", root);
+      const tam = corto * 0.021, y = H * (vertical ? 0.045 : 0.05), x = W * 0.06;
+      const n = E.cabecera.n, total = E.cabecera.total;
+      const dosCifras = (k) => String(k).padStart(2, "0");
+      const puntos = Array.from({ length: Math.min(total, 10) }, (_, k) =>
+        `<span style="display:inline-block;width:${tam * 0.55}px;height:${tam * 0.55}px;margin:0 ${tam * 0.22}px;` +
+        `background:${k === Math.min(n, 10) - 1 ? "#f2f5f8" : "rgba(242,245,248,0.28)"}"></span>`).join("");
+      cab.style.cssText += `z-index:8;font-family:var(--f-texto);font-weight:800;font-size:${tam}px;letter-spacing:0.08em;` +
+        `color:var(--tinta-suave);text-transform:uppercase;`;
+      cab.innerHTML = `<div style="position:absolute;left:${x}px;top:${y}px;max-width:${W * 0.42}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapar(E.cabecera.texto || "")}</div>` +
+        (vertical ? "" : `<div style="position:absolute;left:0;right:0;top:${y}px;text-align:center">${puntos}</div>`) +
+        `<div style="position:absolute;right:${x}px;top:${y}px">${dosCifras(n)} / ${dosCifras(total)}</div>`;
+    }
     const grano = Number(v("grano") || 0);
     if (grano > 0) {
       const c = document.createElement("canvas");
@@ -170,12 +185,14 @@
     const caja = crear("div", "subs", document.getElementById("root"));
     const tam = corto * (vertical ? 0.068 : 0.062);
     caja.style.cssText += `font-size:${tam}px;top:${H * (vertical ? 0.735 : cuadrado ? 0.8 : 0.83)}px;`;
+    // --sub-grupo: palabras por golpe (3 por defecto; Retro TV y Thriller, frases de una linea de hasta 5)
+    const maxGrupo = Number(v("sub-grupo")) || 3;
     const grupos = [];
     let actual = [];
     lista.forEach((w, i) => {
       actual.push(w);
       const sig = lista[i + 1];
-      if (actual.length >= 3 || /[.,;:!?…]$/.test(w[2]) || !sig || sig[0] - w[1] > 0.45) {
+      if (actual.length >= maxGrupo || /[.,;:!?…]$/.test(w[2]) || !sig || sig[0] - w[1] > 0.45) {
         grupos.push(actual);
         actual = [];
       }

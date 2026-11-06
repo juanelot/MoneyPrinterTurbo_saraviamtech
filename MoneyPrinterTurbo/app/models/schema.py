@@ -205,50 +205,6 @@ class TaskVideoRequest(VideoParams, BaseModel):
     pass
 
 
-# Estilo Zenn por defecto: "dibujo malo hecho en MS Paint", fondo blanco, nada
-# cinematográfico. Es lo que da el look del canal. {theme} y {scene} se inyectan
-# por cada imagen para que encaje con la temática elegida y el segmento narrado.
-DEFAULT_KIE_IMAGE_STYLE = (
-    "The image must look like an extremely simple beginner drawing made in MS Paint. "
-    "It should look like someone who is not good at drawing created it quickly by hand. "
-    "Plain white background, thick crude lines, flat colors, no shading, no 3D, "
-    "not cinematic, not realistic, no text, no watermark."
-)
-
-
-class ImageVideoParams(VideoParams):
-    """
-    Parámetros para el flujo NUEVO de "video de imágenes" estilo Zenn.
-
-    Hereda de VideoParams para reutilizar tal cual generate_audio / generate_subtitle
-    / generate_video (voz TTS, subtítulos quemados, mezcla de música, fallback de
-    códecs). Solo agrega lo específico de la generación de imágenes con Kie AI.
-    """
-
-    # Temática/nicho elegida por el usuario (ej: "primitive humans", "space", "animals").
-    kie_theme: Optional[str] = ""
-    # Plantilla de estilo visual aplicada a TODAS las imágenes (consistencia).
-    kie_image_style: Optional[str] = DEFAULT_KIE_IMAGE_STYLE
-    # Relación de aspecto e idiomas de imagen para Kie (gpt-image-2).
-    kie_aspect_ratio: Optional[str] = "9:16"
-    # Fijo a 1K: 2K cuesta 10 créditos por imagen vs 6 créditos en 1K.
-    kie_resolution: Optional[str] = "1K"
-    # Duración mínima por imagen: segmentos más cortos se fusionan para evitar
-    # parpadeo excesivo y gastar créditos de más. Sincroniza imagen<->voz.
-    min_image_duration: Optional[float] = 2.0
-    # Tope máximo de imágenes (0 = sin tope). Si el guion daría más imágenes,
-    # se sube la duración por imagen para no exceder este presupuesto.
-    max_images: Optional[int] = 0
-    # Fuente de imágenes: "kie" (genera con Kie AI) o "local" (usa imágenes subidas)
-    image_source: Optional[str] = "kie"
-    # Lista de nombres de archivo (dentro de storage/local_videos/) cuando image_source="local"
-    local_image_files: Optional[List[str]] = None
-
-
-class ImageVideoRequest(ImageVideoParams, BaseModel):
-    pass
-
-
 class TaskQueryRequest(BaseModel):
     pass
 

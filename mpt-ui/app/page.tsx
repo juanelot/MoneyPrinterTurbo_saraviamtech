@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Wand2, Film, Image as ImageIcon } from "lucide-react";
+import { Wand2, Film } from "lucide-react";
 import Header from "@/components/Header";
 import VideoForm from "@/components/VideoForm";
-import ZennForm from "@/components/ZennForm";
 import GenerationProgress from "@/components/GenerationProgress";
 import VideoResult from "@/components/VideoResult";
 import VideoLibrary from "@/components/VideoLibrary";
@@ -18,7 +17,7 @@ export interface TaskResult {
   videos: string[];
 }
 
-type Tab = "create" | "zenn" | "library";
+type Tab = "create" | "library";
 
 export default function Home() {
   const { t } = useT();
@@ -84,10 +83,6 @@ export default function Home() {
               <Wand2 size={15} />
               {t("tabCreate")}
             </button>
-            <button style={TAB_BTN(tab === "zenn")} onClick={() => setTab("zenn")}>
-              <ImageIcon size={15} />
-              {t("tabZenn")}
-            </button>
             <button style={TAB_BTN(tab === "library")} onClick={() => setTab("library")}>
               <Film size={15} />
               {t("tabLibrary")}
@@ -106,17 +101,6 @@ export default function Home() {
         {tab === "create" && (
           <div style={{ display: status === "idle" ? "block" : "none" }}>
             <VideoForm
-              onStart={() => setStatus("generating")}
-              onGenerated={handleGenerated}
-              onError={handleError}
-              onLogsChange={handleLogsChange}
-            />
-          </div>
-        )}
-
-        {tab === "zenn" && (
-          <div style={{ display: status === "idle" ? "block" : "none" }}>
-            <ZennForm
               onStart={() => setStatus("generating")}
               onGenerated={handleGenerated}
               onError={handleError}

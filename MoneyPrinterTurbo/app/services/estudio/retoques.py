@@ -112,10 +112,7 @@ def grabar(pid, desde, hasta, texto):
         try:
             ctx = _Ctx(proyecto, tmp)
             audio, srt = os.path.join(tmp, "voz.mp3"), os.path.join(tmp, "voz.srt")
-            if str(p.get("voz")).startswith("clon:"):
-                voz._voz_clonada(ctx, texto, audio, srt)
-            else:
-                voz._voz_tts(ctx, texto, audio, srt)
+            voz._voz_tts(ctx, texto, audio, srt)
             _recortar_silencios(audio, final)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

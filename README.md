@@ -10,7 +10,7 @@ El repositorio contiene dos aplicaciones sobre el mismo motor (MoneyPrinterTurbo
 | App | Para qué | Dónde |
 |---|---|---|
 | **Estudio** (`estudio-ui`) | Videos por pasos con Claude: guion, voz, escenas, contenido, edición y miniatura | `localhost:3100` · https://studio.saraviamtech.com |
-| **Virales** (`mpt-ui`) | Videos rápidos de un solo formulario: clips de stock o imágenes IA de Kie (estilo Zenn) | `localhost:3000` · https://virales.saraviamtech.com |
+| **Virales** (`mpt-ui`) | Videos rápidos de un solo formulario con clips de stock o locales | `localhost:3000` · https://virales.saraviamtech.com |
 
 ---
 
@@ -38,7 +38,7 @@ Cada video es un **proyecto** que avanza por pasos. Puedes ir en orden o volver 
 |---|---|---|
 | **Material** | Pegas el tema, notas o fuentes; eliges la duración (hasta 3 h) y el idioma. | Tú |
 | **Guion** | Claude redacta la locución, o pegas tu guion tal cual. | Claude CLI |
-| **Voz** | Voces de Microsoft, voz clonada, tu propio audio ("Mi audio") o sin voz. | TTS / Whisper |
+| **Voz** | Voces de Microsoft, tu propio audio ("Mi audio") o sin voz. | TTS / Whisper |
 | **Escenas** | Eliges el formato (16:9, 9:16 o 1:1) y el estilo; Claude corta el guion en escenas y escribe el prompt de imagen (y de video) de cada una. | Claude CLI |
 | **Contenido** | En local, pulsas **Generar en Flow** y las imágenes se crean solas. Si no, subes lo que generaste en Flow, la carpeta de la extensión, un ZIP o tus propios recursos. | Flow automático / tú |
 | **Ajuste** | Revisas qué imagen o clip va en cada plano y fijas a mano lo que quieras. | Claude CLI / tú |
@@ -63,8 +63,7 @@ material → guion → voz → escenas + prompts ─┐   ← contenido generado
 
 ### Voz
 - **Microsoft:** más de 300 voces neuronales en muchos idiomas, con el tiempo exacto de cada palabra.
-- **Voz clonada:** el Estudio se conecta a un servidor [Clonar-voz](https://github.com/jceronch1/Clonar-voz) (Qwen3-TTS) que puede estar en esta máquina o en otra con GPU, configurado en `estudio_voz_clonada_url`. Desde el panel grabas o subes 10–15 s de voz y queda en la biblioteca.
-- **Mi audio:** subes una narración ya grabada (tu voz, o la que hiciste con Clonar-voz) en WAV, MP3, M4A, OGG o FLAC, y se sincroniza sola.
+- **Mi audio:** subes una narración ya grabada (tu voz o la de otro programa) en WAV, MP3, M4A, OGG o FLAC, y se sincroniza sola.
   - Whisper saca el tiempo de cada palabra; si el guion coincide con lo que se oye, los subtítulos usan el texto del guion.
   - Tarda unos 8 s por minuto de audio en CPU (14,5 min en menos de 2 min).
   - **Quitar silencios largos:** acorta las pausas que pasen de 1 s, 0,6 s o 0,35 s antes de sincronizar, y el video queda más ágil.
@@ -112,7 +111,7 @@ Paso propio entre **Ajuste** y **Video**, a pantalla ancha y **multipista**, al 
   - **Audios**: efectos o sonidos, con su volumen y su punto de entrada.
   - **Música**: un bloque que se mueve y se recorta; también se elige la canción, el volumen y por qué segundo entra.
 - **Gráficos animados** (botón **Gráfico**): título de impacto (las palabras entran una a una; las marcadas con `*asteriscos*` van en color), cifra que cuenta, rótulo inferior y «Suscríbete»; y además frase cinética (una palabra o grupo cada vez), comparar en barras, anillo de porcentaje, línea de tiempo, lista con checks, A contra B, cita con rotulador, sello («FALSO», «MITO»…) y notificación del móvil. Estas nueve salen de ideas de los videos de [awesome-opus5-5-videos](https://github.com/yihui-dev/awesome-opus5-5-videos), que solo trae prompts, y están escritas desde cero. En barras, línea de tiempo y lista va una fila por renglón («Etiqueta: valor»). Con **Ideas de Claude** (dentro de Gráfico), Claude lee lo que dice la voz y propone gráficos para todo el video (plantilla, textos y momento, solo con datos que se dicen; puedes decirle qué buscar); marcas los que te gusten y se crean y se ponen de una vez en la línea de tiempo (un deshacer los quita). Las ideas quedan guardadas en `graficos/ideas.json` del proyecto. Eliges la plantilla, los textos, el color, la posición y la duración, y se pone en el cabezal como una capa más: se mueve, se recorta y se ve en la vista previa. Las plantillas son propias (HTML + GSAP en `MoneyPrinterTurbo/motion/plantillas/`) y las renderiza [HyperFrames](https://github.com/heygen-com/hyperframes) (Apache-2.0) en un WebM transparente, unos 30 s cada uno; el mismo gráfico con los mismos textos no se vuelve a renderizar. Necesita Node 22 y, una vez, `npm install` en `MoneyPrinterTurbo/motion` (descarga su propio Chrome). La telemetría de HyperFrames va apagada.
-- **Cambiar lo que dice un plano** (panel del plano): escribes otro texto o pides **ideas a Claude** (tres textos que caben en ese hueco, con un pedido opcional como «más gancho»), y **Grabar y poner** regraba solo esa parte con la voz del proyecto (sintética o clonada). El retoque se encaja en el mismo hueco: si es un poco largo se acelera hasta un 30 % y, si es más corto, el resto queda en silencio. Así no se mueve nada más (clips, cortes, subtítulos, capas) ni se vuelve a llamar a Claude para asignar. Los subtítulos de ese hueco toman el texto nuevo y la pista de voz lo marca como «regrabado»; «Volver a la voz original» lo deshace. No se puede con una narración propia.
+- **Cambiar lo que dice un plano** (panel del plano): escribes otro texto o pides **ideas a Claude** (tres textos que caben en ese hueco, con un pedido opcional como «más gancho»), y **Grabar y poner** regraba solo esa parte con la voz del proyecto (la de Microsoft). El retoque se encaja en el mismo hueco: si es un poco largo se acelera hasta un 30 % y, si es más corto, el resto queda en silencio. Así no se mueve nada más (clips, cortes, subtítulos, capas) ni se vuelve a llamar a Claude para asignar. Los subtítulos de ese hueco toman el texto nuevo y la pista de voz lo marca como «regrabado»; «Volver a la voz original» lo deshace. No se puede con una narración propia.
 - **En la pantalla** (vista previa) se arrastran las fotos y videos encima, los textos y los subtítulos para colocarlos donde quieras; la esquina del objeto elegido cambia su tamaño y al pasar por el centro aparecen guías que lo pegan. Una capa a pantalla completa que se mueve pasa a ventana.
 - Todo bloque se **mueve** (también a otra pista del mismo tipo) y se **recorta** por sus bordes; el imán pega a bordes, cabezal, cortes y huecos entre palabras (`Alt` lo suelta).
 - El **cabezal** (línea roja) se agarra y se arrastra; también se puede arrastrar sobre la regla o cualquier hueco de la línea de tiempo, y la vista previa lo sigue.
@@ -172,14 +171,16 @@ Se guarda todo en `storage/estudio/clips/<id>/`.
 Página propia en la barra de arriba. Escribes un tema y sale el video terminado, sin modelos de video ni créditos: todo se dibuja con código (HyperFrames + GSAP).
 
 1. **Guion por escenas:** Claude elige el tipo de cada escena según el nicho y marca la palabra en la que pasa cada animación.
-2. **Voz:** de Microsoft (con el tiempo de cada palabra), tu voz clonada o una grabación tuya (Whisper la escucha y Claude reparte tu texto sin cambiarlo).
+2. **Voz:** de Microsoft (con el tiempo de cada palabra) o una grabación tuya (Whisper la escucha y Claude reparte tu texto sin cambiarlo).
 3. **Escenas dibujadas** justo cuando se dicen: mapas que se mueven (países, ríos, rutas, medidas, satélite, banderas con ojos, pegatinas), cifras que cuentan, barras, listas, versus, líneas de tiempo e ilustraciones a pantalla completa.
 4. **Montaje** con música (baja sola cuando habla la voz) y efectos de sonido, en 9:16, 16:9 y 1:1.
 
 - **Nichos:** mapas e historia, datos y comparaciones, curiosidades, finanzas y economía. Cada uno tiene su estructura y sus escenas.
-- **10 estilos** con galería de muestras: papel antiguo, keynote oscuro, documental, periódico, pizarra, cuaderno, minimal, pop cómic, neón y terminal. Cada estilo tiene sus colores, letras (OFL), textura y forma de entrar, y su familia de dibujos (muñecos de madera, dibujo plano o grabado antiguo).
+- **Estilos** con galería de muestras: papel antiguo, keynote oscuro, documental, periódico, pizarra, cuaderno, minimal, pop cómic, neón, terminal, explicador, **Retro TV** (siluetas blancas sobre negro, cabecera con contador y acabado de tele vieja) y **Thriller** (historia de suspense dibujada, portada en sombra). Cada estilo tiene sus colores, letras (OFL), textura y forma de entrar, y su familia de dibujos (muñecos de madera, plano, grabado, stickman, Retro TV o Thriller; las dos últimas se dibujan en Flow con imágenes de referencia para no perder el estilo).
 - **Biblioteca de dibujos:** pegatinas e ilustraciones hechas con Nano Banana en Flow (`motion/fabrica/datos/hacer_pegatinas.py` y `hacer_estilos.py`, retomables). Puedes crear las tuyas (solo en local) o subirlas. Si a Claude le falta una, la pide y se dibuja al hacer el guion.
 - **Varios videos:** marca "uno por línea" y cada línea del tema es un video con las mismas opciones; se hacen de uno en uno.
+- **Sagas por temporadas:** el botón *Siguiente episodio* de un video pide cuántos episodios (1-10), qué pasa (opcional) y si el último cierra la historia. Claude planea la tanda en una llamada corta; primero escribe todos los guiones en orden (cada uno lee los anteriores) y luego hace la voz y el render de uno en uno. Con *Hacer todo sin parar* cada episodio sale montado aunque el molde tenga revisión o clips. El último guarda hacia dónde puede seguir la historia, y la siguiente tanda arranca de ahí. Si una tanda quedó esperando revisión, *Montar toda la saga* los monta en orden.
+- **Duración:** si el guion se aleja más de un 10 % de las palabras pedidas, Claude lo corrige una vez.
 - **Abrir en el editor:** el botón del lápiz junto a cada video crea un proyecto del Estudio con esa voz y un clip por escena, listo para retocar en el editor (música, textos, capas…).
 - Rehacer con otro estilo o formato solo vuelve a dibujar; las escenas que no cambian salen de la caché.
 
@@ -196,9 +197,9 @@ Se guarda en `storage/estudio/fabrica/<id>/`; las muestras de la galería, en `s
 - **Hojas de referencia** de personajes y lugares, **series** con biblia compartida y episodios.
 - **Crear video:** convierte una creación en un proyecto del Estudio ya relleno, con cuatro opciones de narración: su guion, guion demostración, guion libre o sin voz.
 
-### Asistente y Mis videos
-- **Asistente** (la burbuja de abajo a la derecha): un chat con tu cuenta de Claude que ve el estado del proyecto y puede leer el código para explicar un error. No puede leer `config.toml` ni credenciales.
-- **Mis videos:** cada tarjeta tiene portada y las acciones Ver, Descargar, Editar, Duplicar, Renombrar y Borrar.
+### Mis videos
+- Cada tarjeta tiene portada y las acciones Ver, Descargar, Editar, Duplicar, Renombrar y Borrar.
+- Mis videos, la Fábrica y Clip Studio muestran 12 videos por página.
 
 ---
 
@@ -266,7 +267,7 @@ Imita a la extensión "AI Content Generator":
 
 ### Cómo funciona
 
-El Estudio **no usa la API de Anthropic ni una API key**. Cada vez que necesita a Claude (guion, escenas, catálogo visual, asignación, edición, miniatura, prompts maestros, asistente), el backend lanza el programa **Claude Code** en modo no interactivo:
+El Estudio **no usa la API de Anthropic ni una API key**. Cada vez que necesita a Claude (guion, escenas, catálogo visual, asignación, edición, miniatura, prompts maestros, Fábrica), el backend lanza el programa **Claude Code** en modo no interactivo:
 
 ```
 claude -p --model <haiku|sonnet|opus> --effort <low|medium|high> --output-format json
@@ -412,7 +413,6 @@ Opciones del Estudio en `config.toml` (`[app]`):
 
 ```toml
 estudio_carpetas_permitidas = []   # carpetas del servidor que el Estudio puede leer como recursos
-estudio_voz_clonada_url = ""       # URL del servidor Clonar-voz (vacío = solo voces de Microsoft)
 estudio_flow_habilitado = false    # true para generar las imágenes en Google Flow (ver su sección)
 ```
 
@@ -494,21 +494,10 @@ python fabrica_cli.py --tema "Por qué Bolivia no tiene mar" --estilo papel --ou
 python fabrica_cli.py --temas-archivo temas.txt --nicho finanzas --estilo minimal --formatos 9:16,16:9
 python fabrica_cli.py --perfil fabrica_perfil.json --tema "..." --editor           # y lo abre en el editor
 python fabrica_cli.py --seguir <id>,<id> --out ./videos                            # retomar videos ya creados
+python fabrica_cli.py --siguiente <id> --episodios 5 --idea "buscan un barco"     # temporada de una saga (--final la cierra)
 ```
 
 Imprime `FABRICA=<id>` por video al empezar, `VIDEO=<ruta>` por cada MP4 bajado (con un `.txt` al lado con el título y la descripción) y `PROYECTO=<id>` si se pide `--editor`. Sale con código 0 si todos terminan bien y 1 si alguno falla. Hay un perfil de ejemplo en `fabrica_perfil.example.json`.
-
-**`zenn_cli.py`** genera videos de la app Virales (no del Estudio). Tiene tres modos y los mismos controles que su formulario:
-
-```bash
-# Por defecto ataca https://virales.saraviamtech.com/api/mpt/v1 (MPT_API_BASE para cambiarlo)
-python zenn_cli.py --perfil perfil_zenn.json --tema "Mundial 2026" --guion g.txt --max-images 207   # imágenes Kie
-python zenn_cli.py --modo local --tema "Mi video" --guion g.txt --imagenes-dir ./mis_imagenes        # tus imágenes
-python zenn_cli.py --modo video --tema "Datos del espacio" --fuente-clips pexels                     # clips de stock
-python zenn_cli.py --perfil perfil_zenn.json --lote temas.txt --parrafos 30                          # un tema por línea
-```
-
-Espera hasta 2 h, sin el corte de 40 min del navegador. Muestra un latido cada 2 min para que el agente que lo lanzó no crea que se colgó. Las opciones de la línea de comandos mandan sobre el perfil, y hay una plantilla en `perfil_zenn.example.json`.
 
 ---
 
@@ -517,13 +506,10 @@ Espera hasta 2 h, sin el corte de 40 min del navegador. Muestra un latido cada 2
 Es la primera app del repositorio: un formulario para sacar videos rápido con el motor de MoneyPrinterTurbo, sin pasos. Corre en `localhost:3000` (`cd mpt-ui && npm install && npm run dev`) y en https://virales.saraviamtech.com. La interfaz está en español e inglés.
 
 - **Crear video:** tema o guion → voz → clips de Pexels, Pixabay o locales → subtítulos, música y montaje.
-- **Video de imágenes (estilo Zenn):** una imagen "tipo MS Paint" por frase de la voz, generada con **Kie AI** (`kie_api_keys` en `config.toml`) o con tus imágenes. Cada imagen dura exactamente su tramo de voz.
-  - Cuesta unos 6 créditos de Kie por imagen 1K.
-  - Kie admite como mucho 20 peticiones nuevas cada 10 s, y el resto se rechaza (`kie_max_concurrency = 6` va sobrado).
 - **Música propia:** subir, elegir y escuchar MP3. Se guardan en un volumen persistente en el VPS.
 - **Mis videos:** biblioteca con reproductor y descarga.
 
-Un render de 1080×1920 con subtítulos tarda de 5 a 15 min en CPU. Si el navegador avisa de un *timeout* a los 40 min, el backend sigue trabajando: no relances el video, porque vuelve a gastar créditos.
+Un render de 1080×1920 con subtítulos tarda de 5 a 15 min en CPU. Si el navegador avisa de un *timeout* a los 40 min, el backend sigue trabajando: no relances el video.
 
 ---
 
@@ -540,14 +526,13 @@ Saraviamtech_Studio/
 │   │   ├── flow_gen.py             # Generar en Google Flow (lanza tools/flow/lote.js)
 │   │   └── componentes.py          # Prueba rápida de edge-tts (aviso de versión)
 │   ├── app/services/claude_cli.py  # Conexión con Claude CLI
-│   ├── app/services/kie_image.py · image_task.py   # Video de imágenes (Kie / Zenn) de Virales
 │   ├── app/controllers/v1/estudio.py   # Rutas /api/v1/estudio/*
 │   ├── storage/estudio/            # Proyectos, maestros, catálogo
 │   └── config.toml                 # Privado (fuera de git); plantilla en config.example.toml
 ├── tools/flow/                     # Generador de Google Flow (Node + Playwright, solo local)
 ├── mpt-ui/                         # App Virales (Next.js, puerto 3000)
 ├── prompts_maestros/               # Prompts maestros de ejemplo
-├── estudio_cli.py · maestros_cli.py · zenn_cli.py   # Automatización por terminal
+├── estudio_cli.py · fabrica_cli.py · maestros_cli.py   # Automatización por terminal
 ├── docker-stack.yml · DEPLOY.md        # Despliegue en VPS
 └── PLAN_FLOW_LOCAL.md              # Diseño de la integración con Flow
 ```
@@ -561,7 +546,7 @@ Saraviamtech_Studio/
 **Funcionando**
 - Estudio completo en local y en el VPS (studio.saraviamtech.com, actualizado el 19-10-2026 con `edge-tts` 7.3.1): todos los pasos, prompts maestros, series, Mi audio, Sin voz, escenas por clip, sonido de los clips bajo la narración, editor con línea de tiempo y los tres estilos de edición.
 - Generar en Google Flow en local. Se probó de punta a punta: 4 escenas, detener a mitad, continuar (solo generó las que faltaban) y montaje del video.
-- App Virales con Kie, imágenes locales y clips de stock, más `zenn_cli.py`.
+- App Virales con clips de stock o locales.
 
 **Pendiente**
 - **Flow en inglés:** repetir la prueba de 5 escenas con la cuenta de Google en inglés.
@@ -590,6 +575,7 @@ Saraviamtech_Studio/
 | 2026-10-19 | **Generar en Google Flow** (solo local), aviso de versión de `edge-tts` y paso a `edge-tts` 7.3.1 |
 | 2026-10-21 | Exportar e importar prompts maestros y Stickman con los estilos 4 y 5 |
 | 2026-10-23 | **Sonido de los clips** bajo la narración: completo, solo fuertes o silencio, por clip |
+| 2026-11-05 | Fábrica: estilos Retro TV y Thriller, duración ajustada, **sagas por temporadas** y páginas en las listas. Se quitan Blender, el video de imágenes de Kie (Zenn), la voz clonada, el asistente y las familias foto, acuarela, cómic y recortes |
 | 2026-10-23 | **Editor multipista** como paso propio: vista previa sin montar, Medios, capas de fotos y videos, textos, audios, música movible, intro antes de la voz, dividir, borrar, deshacer y rehacer |
 
 ---

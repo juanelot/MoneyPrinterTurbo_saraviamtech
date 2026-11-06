@@ -159,3 +159,36 @@ body {
 [data-estilo="explicador"] .tarjeta::after, [data-estilo="explicador"] .marca::after, [data-estilo="explicador"] .indicador::after {
   content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 17px; background: var(--panel);
 }
+
+/* Retro TV (B3 de stickman-video-director, kaomei, MIT): campo oscuro, siluetas blancas y grises, mucho aire,
+   letra compacta en mayusculas y acabado de emision analogica (lineas, grano, vineta; el resto lo pone ffmpeg al
+   montar: halo, desfase de color y cortes de senal en los cambios). Cabecera con tema y contador "01 / 08". */
+[data-estilo="retrotv"] {
+  --fondo: #07090d; --fondo-2: #121a24; --tinta: #f2f5f8; --tinta-suave: #8d99a8; --acento: #ffffff; --panel: rgba(28, 38, 52, 0.88);
+  --rojo: #ff4b4b; --azul: #6fa8dc; --verde: #7fd1a8; --amarillo: #f2d16b; --naranja: #f2a65a; --morado: #b9a3e3; --gris: #5d6a7a;
+  --mar: #0a0f16; --tierra: #1c2633; --borde: rgba(220, 230, 240, 0.35); --costa: #8d99a8; --pais-alfa: 0.85;
+  --f-titulo: "Inter", Arial, sans-serif; --f-texto: "Inter", Arial, sans-serif; --f-dato: "Inter", Arial, sans-serif;
+  --f-subs: "Inter", Arial, sans-serif;
+  --peso-titulo: 900; --mayus: uppercase; --espaciado: 0.01em;
+  --sub-color: #ffffff; --sub-resalte: #ffffff; --sub-borde: rgba(0, 0, 0, 0.9); --sub-grupo: 5; --sub-mayus: uppercase;
+  --sombra-titulo: 0 0 0.25em rgba(255, 255, 255, 0.35);
+  --grano: 0.07; --vineta: 0.55; --textura: lineas; --entrada: parpadeo; --cabecera: si;
+}
+[data-estilo="retrotv"] .acento { color: #ffffff; text-decoration: underline; text-decoration-color: var(--rojo);
+  text-decoration-thickness: 0.08em; text-underline-offset: 0.12em; }
+
+/* Thriller (B4 de stickman-video-director, kaomei, MIT): ilustracion dibujada a color de guantes blancos;
+   portada con la mitad izquierda en sombra y la pregunta encima; subtitulos de una linea, blanco calido con borde
+   gris oscuro, sin palabra resaltada. */
+[data-estilo="thriller"] {
+  --fondo: #0e1116; --fondo-2: #1d2430; --tinta: #fff6e6; --tinta-suave: #b9b1a3; --acento: #ffcf5a; --panel: rgba(14, 17, 22, 0.86);
+  --rojo: #e5484d; --azul: #4f8fd6; --verde: #4fbf7a; --amarillo: #ffcf5a; --naranja: #f08a3c; --morado: #9b7ad8; --gris: #7b8494;
+  --mar: #142030; --tierra: #2a3140; --borde: rgba(255, 246, 230, 0.4); --costa: #7b8494; --pais-alfa: 0.85;
+  --f-titulo: "Montserrat", Arial, sans-serif; --f-texto: "Montserrat", Arial, sans-serif; --f-dato: "Anton", Impact, sans-serif;
+  --f-subs: "Montserrat", Arial, sans-serif;
+  --peso-titulo: 900; --mayus: uppercase; --espaciado: 0;
+  --sub-color: #fff6e6; --sub-resalte: #fff6e6; --sub-borde: rgba(38, 38, 42, 0.95); --sub-grupo: 5;
+  --sombra-titulo: 0 0.05em 0.25em rgba(0, 0, 0, 0.8);
+  --grano: 0.04; --vineta: 0.45; --entrada: subir; --sombra-portada: si;
+}
+[data-estilo="retrotv"] .rotulo, [data-estilo="retrotv"] .golpe { text-transform: uppercase; }

@@ -87,7 +87,7 @@ export default function Editor({ id, vista, p, set, ejecutar, ocupado, elegirCli
 
   const D = datos?.duracion || (base?.planos.length ? base.planos[base.planos.length - 1].fin : 0);
   const sinVoz = !!datos?.sin_voz;
-  // Se puede regrabar una parte con TTS o voz clonada (no con una grabacion propia).
+  // Se puede regrabar una parte con TTS (no con una grabacion propia).
   const vozElegida = String(p("voz").voz ?? "es-ES-AlvaroNeural-Male");
   const regrabable = !sinVoz && !vozElegida.startsWith("propia:") && vozElegida !== "ninguna";
   const col = useMemo(() => colocacion(extras, D, sinVoz), [extras, D, sinVoz]);
@@ -861,7 +861,7 @@ function Retocar({ id, desde, hasta, texto, regrabable, parche, onPoner, onQuita
   const [aviso, setAviso] = useState("");
   const caben = Math.max(1, Math.round((hasta - desde) * 2.5));
   if (!regrabable) {
-    return <p className="text-xs text-tinta-3">Con una narracion propia no se puede regrabar una parte (cambia la voz a una sintetica o clonada).</p>;
+    return <p className="text-xs text-tinta-3">Con una narracion propia no se puede regrabar una parte (cambia la voz a una de Microsoft).</p>;
   }
   async function ideas() {
     setOcupado("ideas"); setAviso("");

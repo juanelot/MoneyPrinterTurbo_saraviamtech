@@ -3,21 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Box, Clapperboard, Copy, CopyPlus, Download, Eraser, Factory, Film, Library, Lightbulb, ListPlus, Loader2, Mic, Pencil, Play, Save, Sparkles, SquarePen, Trash2, TrendingUp, Upload, X } from "lucide-react";
+import { Clapperboard, Copy, CopyPlus, Download, Eraser, Factory, Film, Library, Lightbulb, ListPlus, Loader2, Mic, Pencil, Play, Save, Sparkles, SquarePen, Trash2, TrendingUp, Upload, X } from "lucide-react";
 import { Accion, AvisoError, Campo, Deslizador, Segmentado } from "@/components/ui";
 import {
-  banco, clonadas, fabrica, listarMusica, mmss, presentadores, type CatalogoFabrica, type PersonajeBlender, type FormatoFabrica, type IdeaFabrica, type MoldeFabrica, type ResumenFabrica, type SesionBanco, type VideoFabrica,
-  type VozClonada,
+  banco, fabrica, listarMusica, mmss, presentadores, type CatalogoFabrica, type FormatoFabrica, type IdeaFabrica, type MoldeFabrica, type ResumenFabrica, type SesionBanco, type VideoFabrica,
 } from "@/lib/api";
 import { AZURE_VOICES } from "@/lib/voces";
 import GaleriaEstilos from "@/components/GaleriaEstilos";
 import NuevoPresentador from "@/components/NuevoPresentador";
+import Paginacion, { usePaginas } from "@/components/Paginacion";
 
 const TRABAJANDO = ["en cola", "guion", "voz", "render", "montaje"];
 
-/** motor "blender": la pestaña Blender (mismo formulario, todas las escenas en 3D y solo sus videos en la lista) */
-export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }) {
-  const blender = motor === "blender";
+export default function PaginaFabrica() {
   const router = useRouter();
   const [cat, setCat] = useState<CatalogoFabrica | null>(null);
   const [lista, setLista] = useState<ResumenFabrica[] | null>(null);
@@ -32,10 +30,8 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
   const [duracion, setDuracion] = useState("55");
   const [idioma, setIdioma] = useState("es-ES");
   const [voz, setVoz] = useState("es-ES-AlvaroNeural-Male");
-  // voz: de Microsoft, una clonada o una grabacion propia (el guion se adapta a ella)
-  const [fuente, setFuente] = useState<"microsoft" | "clonada" | "grabacion">("microsoft");
-  const [vocesClon, setVocesClon] = useState<VozClonada[]>([]);
-  const [clon, setClon] = useState("");
+  // voz: de Microsoft o una grabacion propia (el guion se adapta a ella)
+  const [fuente, setFuente] = useState<"microsoft" | "grabacion">("microsoft");
   const [grabacion, setGrabacion] = useState<{ voz: string; duracion: number; nombre: string } | null>(null);
   const [subiendoVoz, setSubiendoVoz] = useState(false);
   // musica: "random", "" (sin musica) o una cancion
@@ -66,12 +62,6 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
   // presentador: personaje que habla abajo a la derecha (los subtitulos pasan arriba a la izquierda)
   const [presentador, setPresentador] = useState("");
   const [nuevoPres, setNuevoPres] = useState(false);
-  // Blender: el muneco (forma, color, material, accesorio), donde esta y la calidad del render
-  const [personaje, setPersonaje] = useState<PersonajeBlender>({ forma: "huevo", color: "#f2b33d", material: "barro", accesorio: "" });
-  const [escenario, setEscenario] = useState("mesa");
-  const [calidad, setCalidad] = useState<"borrador" | "final">("borrador");
-  const cambiarPj = (c: Partial<PersonajeBlender>) => setPersonaje((p) => ({ ...p, ...c }));
-  const conMotor = () => (blender ? { motor, personaje, escenario, calidad } : {});
   // cierre de marca: el nombre del canal, se recuerda en este navegador
   const [marca, setMarca] = useState("");
   useEffect(() => { setMarca(localStorage.getItem("fabrica-marca") || ""); }, []);
@@ -90,13 +80,12 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
   const quitarIdea = (t: string) => fabrica.quitarIdea(nicho, t).then((r) => setIdeas(r.ideas)).catch(() => {});
 
   const cargar = useCallback(() => fabrica.listar()
-    .then((r) => setLista(r.videos.filter((s) => (s.opciones?.motor === "blender") === blender)))
-    .catch((e) => setError(String(e.message || e))), [blender]);
+    .then((r) => setLista(r.videos))
+    .catch((e) => setError(String(e.message || e))), []);
   useEffect(() => {
     fabrica.catalogo().then(setCat).catch((e) => setError(String(e.message || e)));
     cargar();
     listarMusica().then(setCanciones);
-    clonadas.listar().then((r) => setVocesClon(r.activo ? r.voces : [])).catch(() => setVocesClon([]));
   }, [cargar]);
   const trabajando = !!lista?.some((s) => TRABAJANDO.includes(s.estado));
   useEffect(() => {
@@ -135,12 +124,22 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
       const r = await fabrica.liberar(s.id);
       alert(`${(r.liberado / 1048576).toFixed(0)} MB liberados.`);
     });
-  const siguiente = (s: ResumenFabrica) => {
-    const idea = prompt(`Siguiente episodio de «${s.titulo}».\nQue pasa ahora (opcional: vacio = lo decide Claude)`, "");
-    if (idea !== null) accion(s, async () => router.push(`/fabrica/${(await fabrica.siguiente(s.id, idea.trim())).id}`));
+  const [episodios, setEpisodios] = useState<ResumenFabrica | null>(null);
+  const siguiente = (s: ResumenFabrica, cuantos: number, idea: string, final: boolean, sinParar: boolean) => {
+    setEpisodios(null);
+    accion(s, async () => {
+      if (cuantos === 1 && !sinParar) router.push(`/fabrica/${(await fabrica.siguiente(s.id, idea)).id}`);
+      else await fabrica.temporada(s.id, cuantos, idea, final, sinParar);
+    });
   };
+  const montarSaga = (s: ResumenFabrica) => {
+    const n = (lista || []).filter((x) => x.saga === s.saga && x.estado === "revision").length;
+    if (s.saga && confirm(`¿Montar los ${n} episodios de «${s.saga_nombre || s.titulo}» que esperan? Se hacen de uno en uno, con lo que ya tienen.`))
+      accion(s, () => fabrica.montarSaga(s.saga!));
+  };
+  const paginas = usePaginas(lista, 12);
 
-  const vozFinal = fuente === "microsoft" ? voz : fuente === "clonada" ? (clon ? `clon:${clon}` : "") : grabacion?.voz || "";
+  const vozFinal = fuente === "microsoft" ? voz : grabacion?.voz || "";
   const listo = !!vozFinal && (fuente === "grabacion" || !!tema.trim());
   // lote: un video por linea (no con grabacion propia, que es de un solo video)
   const temas = varios && fuente !== "grabacion" ? tema.split("\n").map((t) => t.trim()).filter(Boolean) : [];
@@ -172,7 +171,7 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
     setError(null);
     try {
       const opciones = { nicho, estilo, formatos, voz: vozFinal, duracion: Number(duracion), musica,
-        musica_volumen: volMusica, subtitulos, efectos, foco, nuevos, idioma: nombreIdioma, velocidad: 1, serie, marca, visual, presentador, revisar, clips, banco: usarBanco ? bancoSel : [], banco_modo: bancoModo, ...conMotor(), ...extra };
+        musica_volumen: volMusica, subtitulos, efectos, foco, nuevos, idioma: nombreIdioma, velocidad: 1, serie, marca, visual, presentador, revisar, clips, banco: usarBanco ? bancoSel : [], banco_modo: bancoModo, ...extra };
       const unico = temas.length > 1 ? "" : (temas[0] || tema).trim();
       if (unico) {
         // no repetir: si ya hay un video casi igual, se pregunta antes
@@ -205,14 +204,10 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
     setNicho(o.nicho); setEstilo(o.estilo); setFormatos(o.formatos); setDuracion(String(o.duracion));
     setMusica(o.musica); setVolMusica(o.musica_volumen); setSubtitulos(o.subtitulos); setEfectos(o.efectos);
     setFoco(o.foco ?? true); setNuevos(o.nuevos); setSerie(o.serie || ""); setVisual(o.visual || ""); setPresentador(o.presentador || "");
-    if (o.personaje) setPersonaje(o.personaje);
-    if (o.escenario) setEscenario(o.escenario);
-    if (o.calidad) setCalidad(o.calidad);
     setRevisar(!!o.revisar); setClips(!!o.clips);
     setBancoSel(o.banco || []); setUsarBanco(!!o.banco?.length); setBancoModo(o.banco_modo || "insertos");
     if (o.marca) cambiarMarca(o.marca);
-    if (o.voz.startsWith("clon:")) { setFuente("clonada"); setClon(o.voz.slice(5)); }
-    else {
+    {
       const v = AZURE_VOICES.find((x) => x.value === o.voz);
       setFuente("microsoft");
       if (v) setIdioma(v.lang);
@@ -226,7 +221,7 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
     setError(null);
     try {
       const m = await fabrica.guardarMolde(nombre.trim(), { opciones: { nicho, estilo, formatos, voz: vozFinal, duracion: Number(duracion), musica,
-        musica_volumen: volMusica, subtitulos, efectos, foco, nuevos, idioma: nombreIdioma, velocidad: 1, serie, marca, visual, presentador, revisar, clips, banco: usarBanco ? bancoSel : [], banco_modo: bancoModo, ...conMotor(), ...extra } });
+        musica_volumen: volMusica, subtitulos, efectos, foco, nuevos, idioma: nombreIdioma, velocidad: 1, serie, marca, visual, presentador, revisar, clips, banco: usarBanco ? bancoSel : [], banco_modo: bancoModo, ...extra } });
       const r = await fabrica.moldes();
       setMoldes(r.moldes);
       setMolde(m.id);
@@ -246,33 +241,20 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
       <section className="mb-10 grid gap-8 md:grid-cols-[1fr_1.15fr]">
         <div>
           <p className="etiqueta mb-3 flex items-center gap-2">
-            {blender ? <><Box size={15} /> Videos en 3D desde un tema</> : <><Factory size={15} /> Videos enteros desde un tema</>}
+            <Factory size={15} /> Videos enteros desde un tema
           </p>
-          <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight md:text-5xl">{blender ? "Blender" : "Fabrica"}</h1>
-          {blender ? (
-            <p className="mt-4 max-w-xl text-tinta-2">
-              Claude escribe el guion por planos y elige la escena 3D de cada uno: el muneco que habla (barro, plastico,
-              vinilo o peluche), comparar tamanos, fisica (lluvia de monedas, derrumbe, domino, llenar), cifras en 3D, el
-              globo que vuela a cada pais, un objeto protagonista como en un anuncio, el titulo en letras 3D que caen o un mundo en miniatura que se construye solo. Blender los pinta en este PC y la boca
-              se mueve con la voz (la de Microsoft o tu grabacion). Sin modelos de video: no gasta creditos, solo tiempo de tu PC
-              (en borrador, unos 4 min por cada 3 s de video).
-            </p>
-          ) : (
+          <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight md:text-5xl">Fabrica</h1>
           <p className="mt-4 max-w-xl text-tinta-2">
             Escribe el tema y elige nicho, estilo y formatos. Claude escribe el guion por escenas, la voz marca el segundo
             de cada palabra y cada escena se dibuja con codigo (mapas, satelite, banderas, personajes, rutas, cifras) justo
             cuando se dice. Sin modelos de video: no gasta creditos.
           </p>
-          )}
-          {!blender && <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-5 flex flex-wrap gap-2">
             <Link href="/fabrica/biblioteca" className="boton boton-linea inline-flex"><Library size={15} /> Biblioteca de dibujos</Link>
             <Link href="/fabrica/ideas" className="boton boton-linea inline-flex"><TrendingUp size={15} /> Ideas virales</Link>
             <Link href="/fabrica/clonar" className="boton boton-linea inline-flex"><CopyPlus size={15} /> Clonar video</Link>
             <Link href="/fabrica/banco" className="boton boton-linea inline-flex"><Clapperboard size={15} /> Banco de clips</Link>
-          </div>}
-          {blender && cat?.blender && !cat.blender.disponible && (
-            <p className="mt-4 rounded-xl bg-error-suave p-3 text-sm text-error">{cat.blender.falta}</p>
-          )}
+          </div>
           {cat?.falta && <p className="mt-4 rounded-xl bg-error-suave p-3 text-sm text-error">{cat.falta}</p>}
         </div>
         <div className="rounded-2xl border border-linea bg-tarjeta p-5 shadow-sm">
@@ -344,7 +326,7 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
                 {cat?.series?.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
               </select>
             </Campo>
-            {!blender && <Campo etiqueta="Presentador">
+            <Campo etiqueta="Presentador">
               <select className="campo" value={presentador} onChange={(e) => setPresentador(e.target.value)}
                 title={cat?.presentadores?.find((x) => x.id === presentador)?.descripcion || "Sin presentador"}>
                 <option value="">Ninguno</option>
@@ -379,7 +361,7 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
                   fabrica.catalogo().then((c) => { setCat(c); setPresentador(id); }).catch(() => {});
                 }} />
               )}
-            </Campo>}
+            </Campo>
             <Campo etiqueta={fuente === "grabacion" ? "Idioma de los textos" : "Idioma de la voz"}>
               <select className="campo" value={idioma} onChange={(e) => {
                 setIdioma(e.target.value);
@@ -396,19 +378,10 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
                 </select>
               </Campo>
             )}
-            {fuente === "clonada" && (
-              <Campo etiqueta="Voz clonada">
-                <select className="campo" value={clon} onChange={(e) => setClon(e.target.value)}>
-                  <option value="">Elige una…</option>
-                  {vocesClon.map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
-                </select>
-              </Campo>
-            )}
           </div>
           <div className="mt-4">
             <Segmentado valor={fuente} onChange={setFuente} opciones={[
               { v: "microsoft" as const, t: "Voz de Microsoft" },
-              ...(vocesClon.length ? [{ v: "clonada" as const, t: "Mi voz clonada" }] : []),
               { v: "grabacion" as const, t: "Subir grabacion" },
             ]} />
             {fuente === "grabacion" && (
@@ -429,43 +402,7 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
             <p className="etiqueta mb-1.5">Estilo</p>
             <GaleriaEstilos valor={estilo} onCambio={setEstilo} />
           </div>
-          {blender && (
-            <div className="mt-4 rounded-xl border border-linea p-3">
-              <p className="etiqueta mb-2">Personaje</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Campo etiqueta="Forma">
-                  <Segmentado valor={personaje.forma} onChange={(v) => cambiarPj({ forma: v })}
-                    opciones={(cat?.blender?.formas || []).map((x) => ({ v: x.id, t: x.nombre }))} />
-                </Campo>
-                <Campo etiqueta="Color">
-                  <input type="color" className="h-10 w-full cursor-pointer rounded-lg border border-linea bg-transparent"
-                    value={personaje.color} onChange={(e) => cambiarPj({ color: e.target.value })} />
-                </Campo>
-                <Campo etiqueta="Material">
-                  <select className="campo" value={personaje.material} onChange={(e) => cambiarPj({ material: e.target.value })}>
-                    {cat?.blender?.materiales.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-                  </select>
-                </Campo>
-                <Campo etiqueta="Accesorio">
-                  <select className="campo" value={personaje.accesorio} onChange={(e) => cambiarPj({ accesorio: e.target.value })}>
-                    {cat?.blender?.accesorios.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-                  </select>
-                </Campo>
-                <Campo etiqueta="Escenario">
-                  <select className="campo" value={escenario} onChange={(e) => setEscenario(e.target.value)}>
-                    {cat?.blender?.escenarios.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-                  </select>
-                </Campo>
-                <Campo etiqueta="Calidad">
-                  <select className="campo" value={calidad} onChange={(e) => setCalidad(e.target.value as "borrador" | "final")}>
-                    {cat?.blender?.calidades.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-                  </select>
-                </Campo>
-              </div>
-              <p className="mt-2 text-xs text-tinta-3">El estilo de arriba solo cambia la letra y los colores de los textos encima del 3D.</p>
-            </div>
-          )}
-          {!blender && <Campo etiqueta="Imagenes" className="mt-4">
+          <Campo etiqueta="Imagenes" className="mt-4">
             <select className="campo" value={visual} onChange={(e) => setVisual(e.target.value)}>
               <option value="">Las del estilo</option>
               {cat?.visuales?.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
@@ -476,7 +413,7 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
                 solo en el PC con Flow) y quedan guardados para los siguientes.
               </p>
             )}
-          </Campo>}
+          </Campo>
           <div className="mt-4 flex flex-wrap items-end gap-5">
             <Campo etiqueta="Formatos">
               <div className="flex gap-2">
@@ -543,7 +480,7 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
               <input type="checkbox" checked={clips} onChange={(e) => setClips(e.target.checked)} /> Clips de video
             </label>
           </div>
-          {!blender && bancos.length > 0 && (
+          {bancos.length > 0 && (
             <div className={`mt-4 rounded-xl border p-3 ${usarBanco ? "border-marca" : "border-linea"}`}>
               <label className="flex cursor-pointer items-start gap-2 text-sm">
                 <input type="checkbox" className="mt-1" checked={usarBanco}
@@ -591,7 +528,7 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
         <p className="rounded-2xl border border-dashed border-linea p-10 text-center text-tinta-3">Todavia no hay videos. Escribe el primer tema.</p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {lista.map((s) => {
+          {paginas.items.map((s) => {
             const v = principal(s.videos || []);
             const enCurso = TRABAJANDO.includes(s.estado);
             return (
@@ -629,6 +566,11 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
                 </button>
                 <Link href={`/fabrica/${s.id}`} className="block flex-1 p-4">
                   <h3 className="line-clamp-1 font-semibold" title={s.titulo}>{s.titulo}</h3>
+                  {(s.saga || (s.opciones.episodio || 1) > 1) && (
+                    <p className="mt-1 text-xs font-semibold text-acento">
+                      Episodio {s.opciones.episodio || 1}{s.saga_nombre ? ` · ${s.saga_nombre}` : ""}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-tinta-3">
                     {cat?.estilos.find((x) => x.id === s.opciones.estilo)?.nombre || s.opciones.estilo} · {s.opciones.formatos.join(" · ")}
                     {" · "}{new Date(s.actualizado * 1000).toLocaleString()}
@@ -646,7 +588,10 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
                       <Accion icono={<Download size={14} />} texto="Descargar" disabled={!v}
                         href={v ? fabrica.urlVideo(s.id, v.formato, true) : undefined} />
                       <Accion icono={<SquarePen size={14} />} texto="Editar" soloIcono derecha href={`/fabrica/${s.id}`} />
-                      <Accion icono={<ListPlus size={14} />} texto="Siguiente episodio" soloIcono disabled={enCurso || s.estado === "error"} onClick={() => siguiente(s)} />
+                      <Accion icono={<ListPlus size={14} />} texto="Siguiente episodio" soloIcono disabled={enCurso || s.estado === "error"} onClick={() => setEpisodios(s)} />
+                      {s.saga && s.estado === "revision" && (
+                        <Accion icono={<Clapperboard size={14} />} texto="Montar toda la saga" soloIcono onClick={() => montarSaga(s)} />
+                      )}
                       <Accion icono={<Copy size={14} />} texto="Duplicar" soloIcono disabled={enCurso} onClick={() => duplicar(s)} />
                       <Accion icono={<Pencil size={14} />} texto="Renombrar" soloIcono onClick={() => renombrar(s)} />
                       <Accion icono={<Eraser size={14} />} texto="Liberar espacio (cache de escenas)" soloIcono disabled={enCurso} onClick={() => liberar(s)} />
@@ -659,9 +604,65 @@ export default function PaginaFabrica({ motor = "" }: { motor?: "" | "blender" }
           })}
         </ul>
       )}
+      <Paginacion {...paginas} />
 
       {viendo && <Reproductor s={viendo} onCerrar={() => setViendo(null)} />}
+      {episodios && <SiguientesEpisodios s={episodios} onCerrar={() => setEpisodios(null)} onHacer={siguiente} />}
     </main>
+  );
+}
+
+// Siguiente episodio: uno (como antes) o una tanda que Claude planea de una vez (guiones en orden, luego voz y render)
+function SiguientesEpisodios({ s, onCerrar, onHacer }: {
+  s: ResumenFabrica; onCerrar: () => void;
+  onHacer: (s: ResumenFabrica, cuantos: number, idea: string, final: boolean, sinParar: boolean) => void;
+}) {
+  const [cuantos, setCuantos] = useState(3);
+  const [idea, setIdea] = useState("");
+  const [final, setFinal] = useState(false);
+  const [sinParar, setSinParar] = useState(true);
+  const n = (s.opciones.episodio || 1) + 1;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onCerrar}>
+      <div className="w-full max-w-md rounded-2xl border border-linea bg-tarjeta p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-display text-lg font-semibold">Siguientes episodios</h3>
+            <p className="text-xs text-tinta-3">Siguen a «{s.titulo}»</p>
+          </div>
+          <button onClick={onCerrar} className="boton boton-fantasma !p-1.5" title="Cerrar"><X size={16} /></button>
+        </div>
+        {s.saga_despues && (
+          <p className="mb-3 rounded-xl bg-hundido p-3 text-xs text-tinta-2"><b>Habia quedado pendiente:</b> {s.saga_despues}</p>
+        )}
+        <Campo etiqueta="Cuantos episodios" ayuda={cuantos > 1
+          ? `Del ${n} al ${n + cuantos - 1}. Claude planea la tanda en una llamada corta; luego hace todos los guiones en orden y despues la voz y el render de cada uno.`
+          : `Solo el episodio ${n}.`}>
+          <input type="number" min={1} max={10} value={cuantos} className="campo w-24"
+            onChange={(e) => setCuantos(Math.min(10, Math.max(1, Number(e.target.value) || 1)))} />
+        </Campo>
+        <Campo etiqueta="Que pasa (opcional)" ayuda="Vacio = lo decide Claude siguiendo la historia." className="mt-3">
+          <textarea value={idea} onChange={(e) => setIdea(e.target.value)} rows={3} className="campo w-full"
+            placeholder="Ej.: encuentran un barco y llegan a una isla que parece segura" />
+        </Campo>
+        {cuantos > 1 && (
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={final} onChange={(e) => setFinal(e.target.checked)} />
+            El ultimo episodio cierra la historia (si no, queda abierta para otra tanda)
+          </label>
+        )}
+        <label className="mt-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={sinParar} onChange={(e) => setSinParar(e.target.checked)} />
+          Hacer todo sin parar: cada episodio sale ya montado (no espera a que revises ni le des a Montar)
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onCerrar} className="boton boton-linea">Cancelar</button>
+          <button onClick={() => onHacer(s, cuantos, idea.trim(), final, sinParar)} className="boton boton-acento">
+            <ListPlus size={15} /> {cuantos > 1 ? `Hacer ${cuantos} episodios` : "Hacer el episodio"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

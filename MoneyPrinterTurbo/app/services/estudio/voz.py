@@ -1,6 +1,6 @@
 """
 Etapa VOZ: sintetiza el guion con el TTS de MoneyPrinterTurbo y lo corta en
-PLANOS usando los tiempos de ESA voz (igual que el modo local/Zenn), asi el
+PLANOS usando los tiempos de ESA voz (igual que el modo local), asi el
 cambio de imagen cae justo donde cambia la narracion.
 
 Planos: se fusionan los trozos mas cortos que `plano_min_s` y se parten los mas
@@ -27,8 +27,8 @@ import unicodedata
 
 from app.config import config
 from app.services import subtitle, voice
-from app.services.estudio import componentes, medios, voz_clonada
-from app.services.image_task import merge_short_segments, parse_segments
+from app.services.estudio import componentes, medios
+from app.services.segmentos import merge_short_segments, parse_segments
 from app.utils import utils
 
 DEFECTOS = {
@@ -104,8 +104,6 @@ def ejecutar(ctx):
     extra = {}
     if propia:
         duracion, extra = _voz_propia(ctx, texto, audio, srt)
-    elif str(p["voz"]).startswith("clon:"):
-        duracion = _voz_clonada(ctx, texto, audio, srt)
     else:
         duracion = _voz_tts(ctx, texto, audio, srt)
     crudos = parse_segments(srt)
@@ -207,34 +205,6 @@ def srt_de_palabras(texto, palabras, destino):
     with open(destino, "w", encoding="utf-8") as f:
         f.write("\n".join(lineas) + "\n")
     return True
-
-
-def _voz_clonada(ctx, texto, audio, srt):
-    """Servidor Clonar-voz externo: bloques cacheados + tiempos por bloque."""
-    p = ctx.params
-    vid = str(p["voz"])[len("clon:"):]
-    idioma = str(ctx.params_de("guion").get("idioma") or "es").split("-")[0]
-    wav = os.path.join(ctx.dir("voz"), "clon.wav")
-    segmentos = voz_clonada.sintetizar(ctx, texto, vid, idioma, wav)
-
-    ctx.avisar("convirtiendo la narracion", 70)
-    vel = min(2.0, max(0.5, float(p["velocidad"] or 1.0)))
-    args = [medios.ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-i", wav]
-    if abs(vel - 1.0) > 1e-3:
-        args += ["-filter:a", f"atempo={vel}"]
-    r = medios.correr(args + ["-c:a", "libmp3lame", "-q:a", "2", audio], timeout=1800)
-    if r.returncode != 0 or not os.path.exists(audio):
-        raise RuntimeError(f"ffmpeg no pudo convertir la voz clonada: {r.stderr[-300:]}")
-    os.remove(wav)
-    duracion = float(medios.sondear(audio).get("duracion") or 0)
-    if duracion <= 0:
-        raise RuntimeError("no se pudo medir la duracion de la voz clonada")
-
-    lineas = [utils.text_to_srt(i, t, a / vel, min(b / vel, duracion))
-              for i, (a, b, t) in enumerate(segmentos, start=1)]
-    with open(srt, "w", encoding="utf-8") as f:
-        f.write("\n".join(lineas) + "\n")
-    return duracion
 
 
 # ------------------------------------------------------------------ audio propio

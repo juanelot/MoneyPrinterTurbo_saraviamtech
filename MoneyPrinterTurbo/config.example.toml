@@ -29,13 +29,6 @@ pexels_api_keys = []
 # 特别注意格式，Key 用英文双引号括起来，多个Key用逗号隔开
 pixabay_api_keys = []
 
-# Kie AI API Key — para el flujo "video de imágenes" estilo Zenn
-# (modelo gpt-image-2-text-to-image). Regístrate en https://kie.ai
-# Una sola key: kie_api_keys = "tu-key"   |   varias: kie_api_keys = ["k1","k2"]
-kie_api_keys = ""
-# Imágenes Kie a generar en paralelo (más = más rápido, pero ojo al rate-limit)
-kie_max_concurrency = 6
-
 # 支持的提供商 (Supported providers):
 #   openai
 #   aihubmix   (OpenAI-compatible AI model gateway)
@@ -67,11 +60,6 @@ claude_cli_path = ""          # vacio = buscar `claude` en el PATH
 # Estudio: carpetas del servidor que se pueden usar como fuente de recursos.
 # Vacio = cualquiera (uso local). En un VPS, limitalo: ["/recursos"]
 estudio_carpetas_permitidas = []
-
-# Estudio: servidor de voz clonada (github.com/jceronch1/Clonar-voz) en esta u
-# otra maquina, p. ej. "http://127.0.0.1:8095" o "https://usuario:clave@voz.midominio.com".
-# Vacio = sin voces clonadas (solo las de Microsoft).
-estudio_voz_clonada_url = ""
 
 # Estudio: generar las imagenes de las escenas en Google Flow (Nano Banana, gratis)
 # con tools/flow (Node 18+, Chrome y `npm install` en esa carpeta). SOLO en la

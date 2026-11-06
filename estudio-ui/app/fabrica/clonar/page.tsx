@@ -138,7 +138,7 @@ function Receta({ d, onBorrar, onReplicar }: {
   const [tema, setTema] = useState("");
   const [nicho, setNicho] = useState(r.nicho_sugerido || "curiosidades");
   const [estilo, setEstilo] = useState("oscuro");
-  const [visual, setVisual] = useState("foto");
+  const [visual, setVisual] = useState("");
   const [formato, setFormato] = useState<FormatoFabrica>(r.formato || "9:16");
   const [duracion, setDuracion] = useState(String(Math.max(20, Math.round(r.duracion / 5) * 5)));
   const [voz, setVoz] = useState("es-ES-AlvaroNeural-Male");

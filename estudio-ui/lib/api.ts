@@ -80,21 +80,12 @@ export interface CatalogoFabrica {
   series: { id: string; nombre: string; descripcion: string }[];
   /** personajes que pueden presentar el video (abajo a la derecha, hablando) */
   presentadores?: { id: string; nombre: string; descripcion: string; propio?: boolean }[];
-  /** motor 3D: si hay Blender en esta maquina y las opciones del muneco */
-  blender?: CatalogoBlender;
-  /** aspecto de los dibujos (familias): madera, plano, grabado, foto, acuarela... */
+  /** aspecto de los dibujos (familias): madera, plano, grabado, stickman... */
   visuales?: { id: string; nombre: string }[];
   estilos: { id: string; nombre: string; descripcion: string }[];
   formatos: FormatoFabrica[]; falta: string;
 }
-export interface PersonajeBlender { forma: string; color: string; material: string; accesorio: string }
-export interface CatalogoBlender {
-  disponible: boolean; falta: string; personaje: PersonajeBlender;
-  formas: { id: string; nombre: string }[]; materiales: { id: string; nombre: string }[];
-  accesorios: { id: string; nombre: string }[]; escenarios: { id: string; nombre: string }[];
-  calidades: { id: string; nombre: string }[];
-}
-/** voz: de Microsoft, "clon:<id>" o "propia:<archivo>" (grabacion subida con fabrica.subirAudio). musica: "random", "" o una cancion. */
+/** voz: de Microsoft o "propia:<archivo>" (grabacion subida con fabrica.subirAudio). musica: "random", "" o una cancion. */
 export interface OpcionesFabrica {
   tema: string; nicho: string; estilo: string; formatos: FormatoFabrica[]; voz: string; velocidad: number;
   duracion: number; musica: string; musica_volumen: number; subtitulos: boolean; efectos: boolean; foco?: boolean; nuevos: boolean; idioma: string;
@@ -102,12 +93,12 @@ export interface OpcionesFabrica {
   serie?: string; marca?: string;
   /** id de catalogo.presentadores o vacio */
   presentador?: string;
-  /** "blender": todas las escenas son planos 3D del muneco (solo en el PC con Blender) */
-  motor?: "" | "blender"; personaje?: PersonajeBlender; escenario?: string; calidad?: "borrador" | "final";
   /** aspecto de los dibujos: "" = el del estilo, o un id de catalogo.visuales */
   visual?: string;
   /** clonar: id de la receta a seguir; clips: Claude escribe el prompt de video de cada ilustracion (se hacen aparte) */
   receta?: string; clips?: boolean;
+  /** saga: id del video al que sigue, numero de episodio y lo que pasa en el (plan de la temporada) */
+  continua?: string; episodio?: number; rumbo?: string;
   /** banco de clips: ids de videos del banco cuyos clips Claude pone detras de las ilustraciones; modo: pocos o casi todo */
   banco?: string[]; banco_modo?: "insertos" | "mayoria";
   /** se para tras el guion y las imagenes (estado "revision") para subir clips, tu voz o la musica; con clips, siempre */
@@ -124,6 +115,8 @@ export interface SesionFabrica {
   estado: EstadoFabrica; progreso: number; mensaje: string; error: string | null;
   /** videos largos: "00:00 Introduccion\n01:12 ..." para la descripcion de YouTube */
   capitulos?: string;
+  /** saga: id de la saga, su nombre y (en el ultimo de una tanda) hacia donde puede seguir */
+  saga?: string; saga_nombre?: string; saga_despues?: string;
 }
 /** muestra: version del video de muestra (0 = todavia se esta haciendo) */
 export interface EstiloFabrica { id: string; nombre: string; descripcion: string; familia?: string; muestra: number }
@@ -158,6 +151,11 @@ export const fabrica = {
   /** saga: video nuevo que continua la historia de este (Dia 1 -> Dia 2) */
   // Borra la cache de escenas ya dibujadas (se redibujan al rehacer o abrir en el editor).
   liberar: (fid: string) => pedir<{ liberado: number; total: number; liberable: number }>(`/fabrica/${fid}/liberar`, { method: "POST" }),
+  /** temporada: Claude planea varios episodios que siguen a este y se hacen de uno en uno (final = cierra la historia) */
+  temporada: (fid: string, cuantos: number, idea = "", final = false, sin_parar = true) =>
+    pedir<{ saga: string; nombre: string; despues: string; videos: SesionFabrica[] }>(`/fabrica/${fid}/temporada`, { method: "POST", ...json({ cuantos, idea, final, sin_parar }) }),
+  /** monta de uno en uno los episodios de la saga que esperan en revision */
+  montarSaga: (sid: string) => pedir<{ videos: SesionFabrica[] }>(`/fabrica/saga/${sid}/montar`, { method: "POST" }),
   siguiente: (fid: string, idea = "") => pedir<SesionFabrica>(`/fabrica/${fid}/siguiente`, { method: "POST", ...json({ idea }) }),
   crear: (o: Partial<OpcionesFabrica> & { tema: string }) => pedir<SesionFabrica>(`/fabrica`, { method: "POST", ...json(o) }),
   /** varios videos con las mismas opciones; se hacen de uno en uno */
@@ -554,6 +552,32 @@ export const flow = {
     pedir<EstadoFlow>(`/proyectos/${id}/flow/detener`, { method: "POST", ...json({ forzar }) }),
 };
 
+// Configuracion (/configuracion): opciones de config.toml + conexion a Claude y Flow.
+export interface OpcionesAjustes {
+  claude_cli_model: string; claude_cli_effort: string; claude_cli_timeout: number;
+  estudio_flow_habilitado: boolean; estudio_flow_modelo: string; estudio_flow_pasadas_extra: number;
+  estudio_carpetas_permitidas: string[];
+}
+export interface EstadoClaude {
+  instalado: boolean; version: string | null; sesion: boolean; email: string | null; plan: string | null;
+  metodo: string | null; iniciando: boolean; url_login: string | null; motivo: string | null;
+}
+export interface EstadoFlowAjustes {
+  habilitado: boolean; corriendo: boolean; chrome: boolean | null; sesion: boolean | null; motivo: string | null;
+}
+export const ajustes = {
+  ver: () => pedir<{ opciones: OpcionesAjustes; claude: EstadoClaude; flow: EstadoFlowAjustes }>("/ajustes"),
+  guardar: (cambios: Partial<OpcionesAjustes>) =>
+    pedir<{ opciones: OpcionesAjustes }>("/ajustes", { method: "PATCH", ...json(cambios) }),
+  claude: () => pedir<EstadoClaude>("/ajustes/claude"),
+  claudeConectar: () => pedir<{ ok: boolean; iniciando: boolean; url_login: string | null }>("/ajustes/claude/conectar", { method: "POST" }),
+  claudeCancelar: () => pedir<{ ok: boolean }>("/ajustes/claude/cancelar", { method: "POST" }),
+  claudeDesconectar: () => pedir<{ ok: boolean }>("/ajustes/claude/desconectar", { method: "POST" }),
+  flow: () => pedir<EstadoFlowAjustes>("/ajustes/flow"),
+  flowConectar: () => pedir<{ ok: boolean }>("/ajustes/flow/conectar", { method: "POST" }),
+  flowDesconectar: () => pedir<{ ok: boolean; cerrado?: boolean }>("/ajustes/flow/desconectar", { method: "POST" }),
+};
+
 export interface ConceptoMiniatura {
   nombre: string; idea: string; texto: string; prompt: string; prompt_sin_texto: string;
   referencia_escena: number | null;
@@ -577,33 +601,10 @@ export const miniatura = {
     pedir<EstadoMiniatura>(`/proyectos/${id}/miniatura/${tipo}`, { method: "DELETE" }),
 };
 
-export interface VozClonada { id: string; nombre: string; duracion: number | null; transcripcion: string }
-export interface VocesClonadas { activo: boolean; voces: VozClonada[]; error: string | null }
-
 export const vozPropia = (id: string, archivo: File) => {
   const fd = new FormData();
   fd.append("audio", archivo, archivo.name);
   return pedir<Vista>(`/proyectos/${id}/voz-propia`, { method: "POST", body: fd });
-};
-
-export const clonadas = {
-  listar: () => pedir<VocesClonadas>("/voces-clonadas"),
-  crear: (audio: Blob, nombre: string, transcripcion = "", archivo = "voz.wav") => {
-    const fd = new FormData();
-    fd.append("audio", audio, archivo);
-    fd.append("nombre", nombre);
-    fd.append("transcripcion", transcripcion);
-    return pedir<VozClonada>("/voces-clonadas", { method: "POST", body: fd });
-  },
-};
-
-export interface Turno { rol: "persona" | "asistente"; texto: string; t: number }
-export interface Charla { id: string; turnos: Turno[]; pensando: boolean; error: string | null }
-
-export const asistente = {
-  preguntar: (pregunta: string, charla?: string | null, proyecto?: string | null) =>
-    pedir<Charla>("/asistente", { method: "POST", ...json({ pregunta, charla, proyecto }) }),
-  ver: (charla: string) => pedir<Charla>(`/asistente/${charla}`),
 };
 
 export const url = {
@@ -615,7 +616,6 @@ export const url = {
   descargar: (id: string) => `${BASE}/proyectos/${id}/descargar`,
   scriptJson: (id: string) => `${BASE}/proyectos/${id}/script.json`,
   promptsTxt: (id: string) => `${BASE}/proyectos/${id}/prompts.txt`,
-  muestraClonada: (vid: string) => `${BASE}/voces-clonadas/${vid}/audio`,
   descargarMiniatura: (id: string) => `${BASE}/proyectos/${id}/miniatura-descargar`,
   srtVideo: (id: string, idioma = "") => `${BASE}/proyectos/${id}/publicar/subtitulos.srt${idioma ? `?idioma=${idioma}` : ""}`,
 };

@@ -136,7 +136,7 @@ export default function EstudioFabrica({ id }: { id: string }) {
                   <button className="boton boton-fantasma !px-2 !py-1 text-xs" onClick={() => setMiVoz(null)}>Quitar</button>
                 </p>
               ) : (
-                <p className="text-sm text-tinta-2">{d.opciones.voz.startsWith("clon:") ? "Tu voz clonada" : d.opciones.voz}</p>
+                <p className="text-sm text-tinta-2">{d.opciones.voz}</p>
               )}
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <button className="boton boton-linea !px-2 !py-1 text-xs" disabled={!guion}

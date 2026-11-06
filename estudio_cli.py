@@ -34,7 +34,7 @@ Ejemplos:
 Salida: codigo 0 si termina bien, 1 si falla. Imprime el id del proyecto al
 principio (PROYECTO=<id>) para poder retomarlo.
 
-Variables de entorno (las mismas que zenn_cli.py):
+Variables de entorno:
   MPT_API_BASE    URL base de la API v1 (default: https://studio.saraviamtech.com/api/motor)
   MPT_BASIC_AUTH  usuario:password si hay auth basica delante (opcional)
 """

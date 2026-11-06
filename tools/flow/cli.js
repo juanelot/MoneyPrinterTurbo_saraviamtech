@@ -2,6 +2,7 @@
 // Utilidades del Chrome de Flow para el Estudio:
 //   node cli.js chrome   abre el Chrome dedicado (perfil FlowImageChrome) para iniciar sesion
 //   node cli.js sesion   {"chrome":bool,"sesion":bool|null,"ocupado":bool} en una linea JSON
+//   node cli.js cerrar   cierra el Chrome dedicado (la sesion de Google queda guardada en el perfil)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,8 +27,19 @@ try {
       const sesion = await comprobarSesion(page).finally(() => browser.close().catch(() => {}));
       console.log(JSON.stringify({ chrome: true, sesion, ocupado: false }));
     }
+  } else if (cmd === 'cerrar') {
+    if (fs.existsSync(LOCK)) {
+      console.log(JSON.stringify({ ok: false, motivo: 'Flow esta generando: detén la generacion antes de cerrar' }));
+    } else if (!(await cdpAlive())) {
+      console.log(JSON.stringify({ ok: true, cerrado: false }));
+    } else {
+      const { browser } = await conectar();
+      const cdp = await browser.newBrowserCDPSession();
+      await cdp.send('Browser.close').catch(() => {});
+      console.log(JSON.stringify({ ok: true, cerrado: true }));
+    }
   } else {
-    console.log('Uso: node cli.js chrome | sesion');
+    console.log('Uso: node cli.js chrome | sesion | cerrar');
   }
 } catch (err) {
   console.log(JSON.stringify({ ok: false, motivo: String(err.message || err) }));

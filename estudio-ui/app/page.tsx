@@ -20,9 +20,11 @@ const EJEMPLOS = [
   "Cronica: el dia que cambio la industria automotriz",
 ];
 
+import Paginacion, { usePaginas } from "@/components/Paginacion";
 export default function Inicio() {
   const router = useRouter();
   const [proyectos, setProyectos] = useState<ResumenProyecto[] | null>(null);
+  const paginas = usePaginas(proyectos, 12);
   const [error, setError] = useState("");
   const [titulo, setTitulo] = useState("");
   const [creando, setCreando] = useState(false);
@@ -183,7 +185,7 @@ export default function Inicio() {
         </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {proyectos.map((p) => (
+          {paginas.items.map((p) => (
             <li key={p.id} className="group flex flex-col overflow-hidden rounded-2xl border border-linea bg-tarjeta transition hover:shadow-md">
               <button
                 onClick={() => (p.mp4 ? setViendo(p) : router.push(`/p/${p.id}`))}
@@ -250,6 +252,7 @@ export default function Inicio() {
           ))}
         </ul>
       )}
+      <Paginacion {...paginas} />
 
       {viendo && viendo.mp4 && <Reproductor p={viendo} onCerrar={() => setViendo(null)} />}
     </main>

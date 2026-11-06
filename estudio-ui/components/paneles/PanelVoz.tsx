@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, Square, Upload } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Mic, Upload } from "lucide-react";
 import type { PanelProps } from "../Proyecto";
 import { AvisoError, Campo, Deslizador, Segmentado, Tarjeta } from "../ui";
 import { AZURE_VOICES } from "@/lib/voces";
-import { clonadas, mmss, url, vozPropia, type VocesClonadas } from "@/lib/api";
+import { mmss, url, vozPropia } from "@/lib/api";
 
 export default function PanelVoz({ id, vista, p, set, ejecutar, ocupado, recargar }: PanelProps) {
   const et = vista.etapas.voz;
@@ -14,8 +14,7 @@ export default function PanelVoz({ id, vista, p, set, ejecutar, ocupado, recarga
   const [idioma, setIdioma] = useState(() => voz.split("-").slice(0, 2).join("-"));
   const idiomas = useMemo(() => Array.from(new Set(AZURE_VOICES.map((x) => x.lang))).sort(), []);
   const voces = AZURE_VOICES.filter((x) => x.lang === idioma);
-  const [tipo, setTipo] = useState<"microsoft" | "clonada" | "propia">(
-    voz.startsWith("clon:") ? "clonada" : voz.startsWith("propia:") ? "propia" : "microsoft");
+  const [tipo, setTipo] = useState<"microsoft" | "propia">(voz.startsWith("propia:") ? "propia" : "microsoft");
   // Escenas de duracion fija (proyecto creado desde un prompt maestro): permiten quitar la voz.
   const fijas = (p("escenas").fijas as { duracion_s?: number }[] | undefined) || [];
   const sinVoz = () => {
@@ -59,7 +58,7 @@ export default function PanelVoz({ id, vista, p, set, ejecutar, ocupado, recarga
         <div className="space-y-4">
           <Segmentado
             valor={tipo}
-            opciones={[{ v: "microsoft", t: "Microsoft" }, { v: "clonada", t: "Voz clonada" }, { v: "propia", t: "Mi audio" },
+            opciones={[{ v: "microsoft", t: "Microsoft" }, { v: "propia", t: "Mi audio" },
               ...(fijas.length ? [{ v: "ninguna" as const, t: "Sin voz" }] : [])]}
             onChange={(t) => {
               if (t === "ninguna") return sinVoz();
@@ -87,8 +86,6 @@ export default function PanelVoz({ id, vista, p, set, ejecutar, ocupado, recarga
                 </Campo>
               </div>
             </>
-          ) : tipo === "clonada" ? (
-            <VozClonada voz={voz} elegir={(v) => set("voz", "voz", v)} />
           ) : (
             <AudioPropio id={id} voz={voz} nombre={(v.propia_nombre as string) || ""} ocupado={ocupado}
               subido={async () => { await recargar(); await ejecutar("voz"); }} />
@@ -159,122 +156,6 @@ export default function PanelVoz({ id, vista, p, set, ejecutar, ocupado, recarga
           </>
         ) : (
           <Tarjeta><p className="text-tinta-2">Elige la voz y sintetiza para escucharla y ver los planos.</p></Tarjeta>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function VozClonada({ voz, elegir }: { voz: string; elegir: (v: string) => void }) {
-  const [datos, setDatos] = useState<VocesClonadas | null>(null);
-  const [nombre, setNombre] = useState("");
-  const [transcripcion, setTranscripcion] = useState("");
-  const [audio, setAudio] = useState<{ blob: Blob; archivo: string } | null>(null);
-  const [grabando, setGrabando] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const grabadora = useRef<MediaRecorder | null>(null);
-  const escucha = useMemo(() => (audio ? URL.createObjectURL(audio.blob) : null), [audio]);
-  const actual = voz.startsWith("clon:") ? voz.slice(5) : "";
-
-  function cargar() {
-    return clonadas.listar().then(setDatos).catch((e) => setError(String(e.message || e)));
-  }
-  useEffect(() => {
-    cargar();
-  }, []);
-
-  async function grabar() {
-    if (grabando) {
-      grabadora.current?.stop();
-      return;
-    }
-    setError(null);
-    try {
-      const flujo = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(flujo);
-      const trozos: Blob[] = [];
-      rec.ondataavailable = (e) => trozos.push(e.data);
-      rec.onstop = () => {
-        flujo.getTracks().forEach((t) => t.stop());
-        setAudio({ blob: new Blob(trozos, { type: rec.mimeType }), archivo: "grabacion.webm" });
-        setGrabando(false);
-      };
-      rec.start();
-      grabadora.current = rec;
-      setGrabando(true);
-    } catch {
-      setError("No se pudo usar el microfono (revisa el permiso del navegador).");
-    }
-  }
-
-  async function guardar() {
-    if (!audio) return;
-    setGuardando(true);
-    setError(null);
-    try {
-      const v = await clonadas.crear(audio.blob, nombre.trim() || "Mi voz", transcripcion, audio.archivo);
-      await cargar();
-      elegir(`clon:${v.id}`);
-      setAudio(null);
-      setNombre("");
-      setTranscripcion("");
-    } catch (e) {
-      setError(String((e as Error).message || e));
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  if (!datos) return <p className="text-sm text-tinta-3">Buscando el servidor de voz clonada…</p>;
-  if (!datos.activo)
-    return (
-      <p className="rounded-xl bg-hundido p-3 text-sm text-tinta-2">
-        No hay un servidor de voz clonada conectado. Arranca <b>Clonar-voz</b> en esta u otra maquina (mejor con
-        GPU) y pon su direccion en <code>config.toml</code> → <code>estudio_voz_clonada_url</code>.
-      </p>
-    );
-
-  return (
-    <div className="space-y-4">
-      <AvisoError texto={datos.error || error} />
-      {datos.voces.length > 0 && (
-        <Campo etiqueta="Voz" ayuda="Se genera en el servidor de clonacion: en CPU tarda de 5 a 12 veces lo que dura el audio (con GPU, casi al momento). Puedes cerrar la pagina; lo ya generado se guarda.">
-          <select className="campo" value={actual} onChange={(e) => elegir(`clon:${e.target.value}`)}>
-            {!actual && <option value="">Elige una voz…</option>}
-            {actual && !datos.voces.some((v) => v.id === actual) && <option value={actual}>(voz borrada del servidor)</option>}
-            {datos.voces.map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
-          </select>
-        </Campo>
-      )}
-      {actual && datos.voces.some((v) => v.id === actual) && (
-        <audio controls className="w-full" src={url.muestraClonada(actual)} />
-      )}
-      <div className="space-y-3 rounded-xl border border-linea p-3">
-        <p className="etiqueta">Anadir una voz</p>
-        <p className="text-xs text-tinta-3">
-          10-15 segundos de una sola persona, sin musica ni eco. Solo tu voz o una con permiso.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={`boton ${grabando ? "boton-acento" : "boton-linea"} !py-1.5 text-sm`} onClick={grabar}>
-            {grabando ? <><Square size={14} /> Parar</> : <><Mic size={14} /> Grabar</>}
-          </button>
-          <label className="boton boton-linea cursor-pointer !py-1.5 text-sm">
-            <Upload size={14} /> Subir audio
-            <input type="file" accept="audio/*" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) setAudio({ blob: f, archivo: f.name }); e.target.value = ""; }} />
-          </label>
-        </div>
-        {audio && (
-          <>
-            <audio controls className="w-full" src={escucha || undefined} />
-            <input className="campo" placeholder="Nombre (ej.: Mi voz)" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-            <textarea className="campo min-h-[60px]" placeholder="Lo que dices en la muestra (opcional, mejora el parecido)"
-              value={transcripcion} onChange={(e) => setTranscripcion(e.target.value)} />
-            <button type="button" className="boton boton-acento !py-1.5 text-sm" disabled={guardando} onClick={guardar}>
-              {guardando ? "Guardando…" : "Guardar voz"}
-            </button>
-          </>
         )}
       </div>
     </div>

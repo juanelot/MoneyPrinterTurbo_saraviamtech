@@ -56,30 +56,6 @@ FAMILIAS = {
                   "old newspaper illustration style, highly detailed, vertical composition",
     },
     # Las de abajo no vienen hechas: cada video genera lo que use y le falte (version_familia) y se guarda.
-    "foto": {
-        "pegatina": "A photorealistic photo of {}, real materials and textures, professional studio product photography, "
-                    "sharp focus, natural colors, full figure, centered",
-        "escena": "Photorealistic documentary photograph of {}, real people and places, natural cinematic lighting, "
-                  "shot on 35mm, highly detailed, realistic textures, vertical composition",
-    },
-    "acuarela": {
-        "pegatina": "A watercolor painting of {}, soft wet edges, delicate pigment blooms, hand-painted, light pencil lines, "
-                    "full figure, centered",
-        "escena": "Watercolor painting of {}, soft washes of color, visible paper texture, delicate hand-painted details, "
-                  "storybook illustration, vertical composition",
-    },
-    "comic": {
-        "pegatina": "A comic book illustration of {}, bold black ink outlines, flat cel shading, halftone dots, "
-                    "dynamic pose, full figure, centered",
-        "escena": "Comic book panel of {}, bold black ink outlines, cel shading, halftone dot texture, dramatic angle, "
-                  "vibrant colors, vertical composition",
-    },
-    "recortes": {
-        "pegatina": "A layered paper cutout craft of {}, cut colored cardstock layers with soft shadows between them, "
-                    "handmade papercraft, full figure, centered",
-        "escena": "Layered paper cutout diorama of {}, cut colored cardstock layers with depth and soft shadows, handmade "
-                  "papercraft art, vertical composition",
-    },
     # palitos de animacion 2.5D: toda persona sale como stickman (cabeza redonda, sin cara ni ropa)
     "stickman": {
         "pegatina": "A 3D rendered stick figure of {}, every person drawn as a simple white stickman with a round head, "
@@ -89,11 +65,52 @@ FAMILIAS = {
                   "thin cylindrical limbs, no face details and no clothes, simple low-detail environment with soft "
                   "shadows, cinematic lighting, muted colors, 2.5D explainer animation style, vertical composition",
     },
+    # Estilos B3 y B4 de stickman-video-director (kaomei, MIT): cada dibujo se pide a Flow con sus imagenes de
+    # referencia (motion/fabrica/referencias/<familia>/) para que no se pierda el estilo entre escenas.
+    "retrotv": {
+        "pegatina": "A flat minimal vector silhouette of {} in soft white and light gray tones with rounded shapes and "
+                    "subtle gray overlap shading, no outlines, no texture, analog broadcast explainer style, full figure, centered",
+        "escena": "Flat minimal explainer illustration of {} on a near-black dark navy background. Every person is a "
+                  "simple white stickman: blank circular white head with no face, rounded white body and limbs with "
+                  "readable gaps and light gray overlap detail. Animals keep an appealing simple face. Objects and rooms "
+                  "are clean flat white and blue-gray silhouettes, generous negative space, one clear focal subject, "
+                  "soft subtle glow on the white shapes, restrained analog broadcast look. No text, no letters, no "
+                  "numbers, no captions, no logos, no realistic rendering, no 3D, no outlines, vertical composition",
+        "referencias": ["retrotv/perro.jpg", "retrotv/cuarto.jpg"],
+    },
+    "thriller": {
+        "pegatina": "A refined full-color 2D hand-drawn story illustration of {}, clear confident black ink contours, broad "
+                    "painted color fields, restrained cel shadows; people are simple stick figures with plain circular "
+                    "white heads, tiny black dot eyes, black stick limbs and compact rounded white cartoon gloves, full figure, centered",
+        "escena": "Refined full-color 2D hand-drawn story illustration of {}. Clear confident black ink contours with a "
+                  "slightly organic drawn character, broad painted color fields, restrained simple cel-shaded shadow "
+                  "patches, only subtle texture. Carefully designed architecture, furniture and story props with readable "
+                  "perspective and foreground, midground and background, purposeful detail without clutter. Characters: "
+                  "plain circular white heads, tiny black oval eyes and an optional short minimal mouth, unclothed "
+                  "single black line torso and black stick limbs, simple small feet, compact rounded WHITE cartoon "
+                  "gloves outlined black with a readable thumb attached at the wrists; coherent arm proportions and "
+                  "real contact with props. Roles differ by pose, expression and a modest hairstyle or accessory. "
+                  "Palette and light follow the setting; night stays legible with cool color fields and warm practical "
+                  "accents. Cinematic tense staging, the threat or problem clearly visible in the picture. Avoid "
+                  "photographic, 3D or concept-art rendering, realistic skin or human anatomy, glossy reflections, "
+                  "volumetric light, heavy bloom, crushed-black backgrounds, extra limbs, detached gloves. No text, "
+                  "captions, speech bubbles or watermarks, vertical composition",
+        "referencias": ["thriller/interior.jpg", "thriller/exterior.jpg"],
+    },
 }
+DIR_REFERENCIAS = os.path.join(DIR_BASE, "referencias")
+
+
+def referencias(familia):
+    """Rutas de las imagenes de referencia que acompanan cada dibujo de esa familia (las que existan)."""
+    rutas = [os.path.join(DIR_REFERENCIAS, r) for r in (FAMILIAS.get(familia) or {}).get("referencias") or []]
+    return [r for r in rutas if os.path.isfile(r)]
+
+
 # nombre para la pantalla de cada familia (madera es la base)
 NOMBRES_FAMILIA = {"madera": "Munecos de madera", "plano": "Ilustracion plana", "grabado": "Grabado antiguo",
-                   "foto": "Realista (foto)", "acuarela": "Acuarela", "comic": "Comic", "recortes": "Recortes de papel",
-                   "stickman": "Stickman (palitos)"}
+                   "stickman": "Stickman (palitos)", "retrotv": "Retro TV (siluetas blancas)",
+                   "thriller": "Thriller dibujado (guantes blancos)"}
 DIR_FAMILIAS = os.path.join(DIR_BASE, "familias")
 
 # Grupos para ordenar la biblioteca en pantalla (lo que no este aqui va a "otros"; las propias, a "propias").
@@ -253,7 +270,7 @@ def version_familia(tipo, clave, familia):
         raise FileNotFoundError(f"no hay descripcion de {clave}")
     clase = (info or {}).get("clase") or ("objeto" if _GRUPO_DE.get(clave) in ("dinero", "lugares", "ciencia") else "personaje")
     destino = _dir_propias("familias", familia, tipo, f"{clave}.webp")
-    _generar(tipo, prompt(tipo, sin_estilo(descripcion), clase, familia), destino)
+    _generar(tipo, prompt(tipo, sin_estilo(descripcion), clase, familia), destino, referencias=referencias(familia))
     return destino
 
 
@@ -322,13 +339,15 @@ def crear(tipo, descripcion, nombre="", clase="personaje", reemplazar=False, fam
     if not descripcion:
         raise ValueError("describe lo que quieres dibujar")
     clave = clave_de(nombre or descripcion) if reemplazar else _clave_libre(tipo, nombre or descripcion)
-    _generar(tipo, prompt(tipo, descripcion, clase, familia), _dir_propias(tipo, f"{clave}.webp"))
+    _generar(tipo, prompt(tipo, descripcion, clase, familia), _dir_propias(tipo, f"{clave}.webp"),
+             referencias=referencias(familia))
     _anotar(tipo, clave, descripcion, clase=clase, **({"familia": familia} if familia in FAMILIAS else {}))
     return {"id": clave, "descripcion": descripcion, "origen": "propia"}
 
 
-def _generar(tipo, texto, destino, alto=ALTO_PEGATINA):
-    """Una imagen con Nano Banana (Flow) guardada en destino: pegatina recortada del verde o ilustracion vertical."""
+def _generar(tipo, texto, destino, alto=ALTO_PEGATINA, referencias=None):
+    """Una imagen con Nano Banana (Flow) guardada en destino: pegatina recortada del verde o ilustracion vertical.
+    referencias: imagenes que se suben con el prompt (estilo de la familia)."""
     if not flow_gen.habilitado():
         raise flow_gen.NoHabilitado("crear con Nano Banana solo funciona en el PC con Flow (aqui puedes subir una imagen)")
     flow_gen._exigir()
@@ -336,7 +355,10 @@ def _generar(tipo, texto, destino, alto=ALTO_PEGATINA):
     try:
         script = os.path.join(tmp, "script.json")
         with open(script, "w", encoding="utf-8") as f:
-            json.dump({"scenes": [{"scene_number": 1, "image_prompt": texto}]}, f, ensure_ascii=False)
+            escena = {"scene_number": 1, "image_prompt": texto}
+            if referencias:
+                escena["ref_images"] = [os.path.abspath(r) for r in referencias]
+            json.dump({"scenes": [escena]}, f, ensure_ascii=False)
         r = subprocess.run([flow_gen._node(), os.path.join(flow_gen._dir_flow(), "lote.js"), "--script", script,
                             "--out", tmp, "--aspect", "9:16" if tipo == "ilustraciones" else "1:1", "--model", "2",
                             "--pasadas-extra", "1"], cwd=flow_gen._dir_flow(), capture_output=True, text=True,

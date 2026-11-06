@@ -4,7 +4,7 @@ Fabrica: videos enteros desde un tema, sin modelos de video (todo se dibuja con 
   1. GUION: Claude escribe el guion partido en ESCENAS (portada, mapa, cifra...) segun el
      nicho. Cada escena trae su trozo de narracion y sus datos; lo que tiene que pasar AL
      DECIR una palabra lleva esa "palabra". guion.json.
-  2. VOZ: el TTS de MPT (edge-tts da el tiempo de cada palabra; tambien voz clonada).
+  2. VOZ: el TTS de MPT (edge-tts da el tiempo de cada palabra) o tu grabacion.
      voz/voz.mp3 y voz/palabras.json (una entrada por palabra del guion).
   3. PLAN: cada escena empieza cuando se dice su primera palabra; las palabras se cambian
      por segundos de la escena y los mapas se encadenan (la camara sigue donde acabo).
@@ -36,7 +36,7 @@ from loguru import logger
 
 from app.services import claude_cli, voice
 from app.services.estudio import acabado, almacen, biblioteca, componentes, edicion, flow_gen, grafo, graficos, medios, satelite
-from app.services.estudio import banco, blender_gen, clonar, modelos3d, presentadores, voz_clonada
+from app.services.estudio import banco, clonar, presentadores
 from app.services.estudio import voz as etapa_voz
 
 DIR_FABRICA = os.path.join(graficos.DIR_MOTION, "fabrica")
@@ -72,6 +72,31 @@ ESTILOS = {
     "terminal": {"nombre": "Terminal", "descripcion": "Pantalla de ordenador antigua: verde fosforo y letra de maquina.", "familia": "plano"},
     "explicador": {"nombre": "Explicador", "descripcion": "Papel crema, tinta y rojo, tarjetas con sombra de puntos. Ideal con presentador.",
                    "familia": "plano"},
+    # B3 y B4 de stickman-video-director (kaomei, MIT). guia = reglas extra del guion; escenas = tipos permitidos
+    # (si falta, los del nicho); palabras = por escena; nuevas = dibujos nuevos como mucho (videos cortos).
+    "retrotv": {"nombre": "Retro TV", "familia": "retrotv", "palabras": "8-14", "segundos": "3-5", "nuevas": 12,
+                "descripcion": "Campo oscuro, siluetas blancas, cabecera con contador y acabado de tele vieja.",
+                "guia": "ESTILO 'Retro TV' (explicador de siluetas blancas sobre negro, como una emision analogica): cada "
+                        "escena muestra UNA idea con un sujeto claro y mucho espacio vacio. Las ilustraciones 'nueva' "
+                        "describen en ingles una escena sencilla: personas como stickman blanco sin cara, animales "
+                        "simpaticos, pocos objetos, nada de texto; varia el plano (general, detalle, comparacion lado a "
+                        "lado, pantalla de camara de vigilancia, diagrama con flechas) y que la imagen ENSENE lo que dice "
+                        "la frase (si dice que se acerca, se ve acercandose). Mezcla con listas, versus y cifras para ordenar "
+                        "ideas. Usa 'sello' con 'FALSO' o 'NO' para tachar una idea equivocada. Pon en la raiz \"cabecera\": "
+                        "\"TEMA / SUBTEMA\" (2-4 palabras, sale arriba en cada escena). La portada lleva \"nueva\": "
+                        "descripcion EN INGLES de la primera imagen (el sujeto del gancho)."},
+    "thriller": {"nombre": "Thriller", "familia": "thriller", "palabras": "5-9", "segundos": "2-3", "nuevas": 20,
+                 "escenas": ["portada", "ilustracion"],
+                 "descripcion": "Historia de suspense dibujada a color, guantes blancos, planos cortos y portada en sombra.",
+                 "guia": "ESTILO 'Thriller' (historia corta de supervivencia o suspense, contada en planos dibujados): "
+                         "una historia con protagonista, situacion, amenaza que escala y giro final; la narracion en "
+                         "frases cortas que crean tension. Los 3 primeros segundos ya muestran el peligro o lo raro. "
+                         "Casi todo son escenas 'ilustracion' de 2-3 s (UNA frase corta cada una) con \"nueva\" en ingles: "
+                         "un plano distinto cada vez (general, primer plano de la cara, detalle de la mano o del objeto, "
+                         "contrapicado, desde lejos), con la amenaza VISIBLE en el dibujo y quien es quien claro (el "
+                         "protagonista siempre con el mismo peinado o accesorio, descrito igual en cada 'nueva'). Nada de "
+                         "sangre ni gore. La portada lleva \"nueva\": descripcion EN INGLES del momento mas inquietante, "
+                         "y su titulo es una pregunta corta. El final puede dejar una pregunta al que mira (sin pedir likes)."},
 }
 
 # Presentador (motion/fabrica/presentador.js): un personaje plano abajo a la derecha que habla todo el video; la
@@ -86,20 +111,8 @@ PRESENTADORES = {
     "sol": {"nombre": "Sol", "descripcion": "Coleta rubia, gafas y sudadera morada.",
             "aspecto": {"piel": "#f6d2b5", "pelo": "#d9a441", "ropa": "#6a4f8a", "ropa2": "#523c6c", "peinado": "coleta", "gafas": True}},
 }
-# Blender (motor 3D) apagado hasta una proxima actualizacion: el codigo queda, pero no se ofrece ni se acepta.
-BLENDER_ACTIVO = False
-BARRO_GUIA = (
-    "VIDEO EN 3D (Blender): todo lo cuenta UN personaje, un muneco que es el narrador y sale en cada escena. Piensa como "
-    "un director: varia la camara (nunca 2 iguales seguidas; 'primer' para emociones, 'general' para situar, "
-    "'contrapicado' para lo enorme o sorprendente), el gesto acompana lo que dice y la cara es la emocion de esa frase. "
-    "Los objetos (0-2 por escena) hacen visible el dato: un cartel con la cifra, un grafico si algo sube, monedas si hay "
-    "dinero, un libro con el tema. Escenas cortas (3-6 s): cada plano nuevo renueva la atencion.\n\n")
 BOCA_DB = (-42.0, -16.0)   # volumen (dB) de boca cerrada y de boca muy abierta
 BOCA_SUELTA = 0.55         # al bajar el volumen la boca se cierra multiplicando por esto cada fotograma
-# color de las formas del kit en 'tamanos' (estrella roja, coche azul...)
-TONOS_3D = {"rojo": "#e2412b", "naranja": "#f08a24", "amarillo": "#f2c230", "blanco": "#f2f4f8", "azul": "#4a86e0",
-            "verde": "#4f9a4b", "morado": "#8a4fc0", "gris": "#9a9a9a"}
-
 # Escenas: lo que Claude puede pedir (campos) y lo que necesita el motor (scripts extra).
 ESCENAS = {
     "portada": {
@@ -195,85 +208,6 @@ ESCENAS = {
                   'algo: si no es una cita real, usa un nombre generico ("Un usuario", "Noticias")',
         "scripts": ["graficas.js"],
     },
-    "barro": {
-        "descripcion": "Un plano 3D (Blender) del personaje del video, un muneco que cuenta la historia: tu eliges "
-                       "camara, gesto, cara y hasta 2 objetos que aparecen a su lado. Encima van los subtitulos.",
-        "campos": '"camara": "general" (se ve el sitio entero) | "medio" (lo normal) | "primer" (su cara, para '
-                  'emociones y momentos fuertes) | "contrapicado" (desde abajo: poder, sorpresa, algo enorme); '
-                  '"gesto": GESTO; "cara": CARA (la emocion de lo que se dice); '
-                  '"objetos"?: [{"tipo": OBJETO, "texto"?: "1-2 palabras escritas en el (cartel, libro, caja o grafico)"}] '
-                  '(0-2, lo que ayuda a entender: un cartel con la cifra, un libro con el tema, monedas si hay dinero); '
-                  '"titulo"?: SOLO en la primera escena: el gancho en 3-6 palabras con *asteriscos* en la palabra clave '
-                  '(sale grande arriba); "golpe"?: {"texto": 2-3 palabras de impacto, "palabra"}',
-        "scripts": ["piezas.js"],
-    },
-    "tamanos": {
-        "descripcion": "Comparar tamanos en 3D (Blender): 2-6 cosas de menor a mayor en fila, cada una aparece al "
-                       "nombrarla y la camara se aleja para que entre todo. Muy viral: de una hormiga a una montana, de un "
-                       "coche a un rascacielos, de la Luna al Sol. Usala cuando el tamano o la escala sorprende.",
-        "campos": '"objetos": [{"nombre": "Torre Eiffel" (corto), "texto": "330 m" (la medida como se lee), "modelo": un id '
-                  'del CATALOGO 3D (una forma o un modelo de Poly Haven), "alto_m": su alto (o diametro) REAL en metros, '
-                  '"palabra"}] (2-6, de menor a mayor; si el modelo es otra cosa parecida, el nombre manda: una torre para '
-                  'la Torre Eiffel, una esfera para una pelota, una estrella para Betelgeuse o Sirio); "color"?: uno de '
-                  + ", ".join(TONOS_3D) + ' (formas del kit: la estrella, el coche, la persona...); "titulo"?: SOLO si '
-                  'es la primera escena; "golpe"?: {"texto", "palabra"}. Lo que queda diminuto al lado de algo enorme '
-                  'se marca solo con una flecha y su nombre',
-        "scripts": ["piezas.js"],
-    },
-    "datos3d": {
-        "descripcion": "Cifras que se tocan en 3D (Blender): columnas que crecen sobre una mesa o torres de monedas de oro "
-                       "(para dinero). Cada dato crece al nombrarlo, con su cifra encima. Para comparar 2-6 cantidades.",
-        "campos": '"modo": "columnas" | "pilas" (pilas = monedas, solo si es dinero); "datos": [{"etiqueta": "Japon" (corta), '
-                  '"valor": 255 (numero), "texto": "255 %" (como se lee), "palabra"}] (2-6, en el orden en que se nombran); '
-                  '"titulo"?: SOLO si es la primera escena; "golpe"?: {"texto", "palabra"}',
-        "scripts": ["piezas.js"],
-    },
-    "fisicas": {
-        "descripcion": "Fisica real en 3D (Blender), lo 'oddly satisfying' que retiene: lluvia de monedas, una torre que se "
-                       "derrumba, domino en cadena o un vaso que se llena hasta un porcentaje. Para un momento fuerte "
-                       "(1-2 por video), cuando la idea se puede VER asi.",
-        "campos": '"fisica": FISICA; "objeto": PIEZA (lluvia y llenar; moneda o billete si hay dinero); "cantidad"?: 20-150 '
-                  '(lluvia: mas = mas impacto); "nivel"?: 0-1 (llenar: el porcentaje, 0.73 para un 73 %); "texto3d"?: una '
-                  'cifra corta que se ve grande detras en 3D ("73 %", "1 de cada 3"); "palabra": donde empieza a pasar; '
-                  '"titulo"?: SOLO si es la primera escena; "golpe"?: {"texto", "palabra"}',
-        "scripts": ["piezas.js"],
-    },
-    "titulo3d": {
-        "descripcion": "El gancho en letras gruesas de 3D (Blender) que caen una a una, rebotan y se quedan; la palabra "
-                       "clave en color. Solo como PRIMERA escena (en vez de llevar 'titulo'), cuando el gancho es una frase "
-                       "corta que choca. Dura lo que su texto (2-4 s).",
-        "campos": '"titulo": la frase en 3-7 palabras con *asteriscos* en la palabra clave; "ambiente": "claro" | '
-                  '"oscuro" | "color"',
-        "scripts": ["piezas.js"],
-    },
-    "globo": {
-        "descripcion": "La Tierra en 3D (Blender): gira y la camara vuela a cada pais al nombrarlo, se clava un pin con "
-                       "su nombre. Para 'donde': de un pais a otro, donde pasa algo, quien tiene mas. 1-4 paises.",
-        "campos": '"paradas": [{"iso": ISO3, "texto": "JAPON" (el nombre o 2-3 palabras: "JAPON 125 M"), "palabra": donde '
-                  'se nombra}] (1-4, en el orden en que se dicen; deja 2 s entre uno y otro); "titulo"?: SOLO si es la '
-                  'primera escena; "golpe"?: {"texto", "palabra"}',
-        "scripts": ["piezas.js"],
-    },
-    "objeto": {
-        "descripcion": "Objeto protagonista en 3D (Blender), como un anuncio: un modelo real cae sobre una peana que gira, "
-                       "le barre una luz y detras sale una palabra enorme. Para presentar la cosa de la que se habla "
-                       "(un invento, un producto, el objeto de la historia). Maximo 1-2 por video.",
-        "campos": '"modelo": un id de los "Modelos reales de Poly Haven" del CATALOGO 3D (no una forma); "texto3d": 1 palabra '
-                  'o cifra corta que sale enorme detras ("1979", "GRATIS", "$5"); "ambiente": "claro" | "oscuro" (premium, '
-                  'misterio) | "color" (alegre); "palabra": donde aparece; "titulo"?: SOLO si es la primera escena; '
-                  '"golpe"?: {"texto", "palabra"}',
-        "scripts": ["piezas.js"],
-    },
-    "diorama": {
-        "descripcion": "Un mundo en miniatura en 3D (Blender) sobre una isla redonda que se construye sola pieza a pieza y "
-                       "gira, con desenfoque de maqueta: una ciudad, un pueblo, un bosque, la nieve o el desierto, de dia o "
-                       "de noche, con coches y nubes moviendose. Para situar la historia (donde vive, de donde viene) o una "
-                       "cifra de un lugar. Maximo 1 por video.",
-        "campos": '"tema": "ciudad" | "pueblo" | "bosque" | "nieve" | "desierto"; "hora": "dia" | "noche"; "texto3d"?: 1-3 '
-                  'palabras o cifra que flota encima ("TOKIO", "37 M"); "palabra": donde empieza a montarse; "titulo"?: '
-                  'SOLO si es la primera escena; "golpe"?: {"texto", "palabra"}',
-        "scripts": ["piezas.js"],
-    },
     "linea_tiempo": {
         "descripcion": "De 2 a 5 fechas en orden sobre una linea que se va dibujando (una historia, una evolucion).",
         "campos": '"titulo"?: "..."; "hitos": [{"fecha": "1929", "texto": "2-6 palabras", ICONO, "palabra": la fecha o '
@@ -281,7 +215,6 @@ ESCENAS = {
         "scripts": ["graficas.js"],
     },
 }
-ESCENAS_3D = ("barro", "tamanos", "fisicas", "datos3d", "globo", "objeto", "titulo3d", "diorama")   # las pinta Blender (blender_gen) y encima va su escena en verde
 
 # Estados del protagonista (motion/fabrica/graficas.js): los de color y tamano duran; los demas son un momento.
 ESTADOS = {
@@ -295,13 +228,6 @@ ESTADOS_FIJOS = ("gris", "apagado", "brillante")   # los que puede llevar un ico
 ICONO = ('"pegatina"?: id de la biblioteca (con "nueva"?: "descripcion EN INGLES" si ninguna es eso; '
          f'"estado"?: {" | ".join(ESTADOS_FIJOS)} para verla asi, p. ej. el protagonista gris frente al de color), '
          'o "iso"?: ISO3 para su bandera (uno de los dos o ninguno)')
-ESCENAS["fisicas"]["campos"] = (ESCENAS["fisicas"]["campos"]
-                                .replace("FISICA", " | ".join(f'"{k}" ({d})' for k, d in blender_gen.FISICAS.items()))
-                                .replace("PIEZA", " | ".join(f'"{p}"' for p in blender_gen.PIEZAS)))
-ESCENAS["barro"]["campos"] = (ESCENAS["barro"]["campos"]
-                              .replace("GESTO", " | ".join(f'"{k}" ({d})' for k, d in blender_gen.GESTOS.items()))
-                              .replace("CARA", " | ".join(f'"{c}"' for c in blender_gen.CARAS))
-                              .replace("OBJETO", " | ".join(f'"{o}"' for o in blender_gen.OBJETOS)))
 for _e in ESCENAS.values():
     _e["campos"] = _e["campos"].replace("ICONO", ICONO).replace(
         "ESTADO", "uno de " + ", ".join(f"{k} ({d})" for k, d in ESTADOS.items()), 1).replace("ESTADO", "uno de esos estados")
@@ -500,7 +426,7 @@ def catalogo():
                for f in presentadores.listar()],
             "visuales": [{"id": k, "nombre": n} for k, n in biblioteca.NOMBRES_FAMILIA.items()],
             "estilos": [{"id": k, **e} for k, e in ESTILOS.items()],
-            "formatos": list(FORMATOS), "falta": graficos.disponible(), "blender": blender_gen.catalogo() if BLENDER_ACTIVO else None}
+            "formatos": list(FORMATOS), "falta": graficos.disponible()}
 
 
 def listar():
@@ -547,7 +473,7 @@ def ver(fid):
 
 
 def _con_estilo_video(guion, o):
-    """Los prompts de video llevan al final el aspecto de los dibujos (stickman, acuarela...): sin la imagen de
+    """Los prompts de video llevan al final el aspecto de los dibujos (stickman, grabado...): sin la imagen de
     partida, Seedance o Veo harian personas reales."""
     if not guion:
         return guion
@@ -641,28 +567,23 @@ def _opciones(o, base=None):
             # revisar: se para tras el guion y las imagenes (estado "revision") para subir clips, tu voz o elegir
             # la musica; luego montar() sigue. Con clips se para siempre (hay que subirlos antes de montar)
             "revisar": bool(o.get("revisar", False)) or bool(o.get("clips", False)),
-            # aspecto de los dibujos: "" (el del estilo), "madera" o una familia (foto, acuarela, comic...)
+            # aspecto de los dibujos: "" (el del estilo), "madera" o una familia (plano, grabado, stickman...)
             "visual": o.get("visual") if o.get("visual") == "madera" or o.get("visual") in biblioteca.FAMILIAS else "",
             # cierre de marca: el nombre del canal sale al final de cada video ("" = sin cierre)
             "marca": str(o.get("marca") or "").strip()[:40],
             # uno de PRESENTADORES o "propio:<id>" (presentadores.py: hecho con Nano Banana o subido)
             "presentador": o.get("presentador") if o.get("presentador") in PRESENTADORES
             or presentadores.aspecto(str(o.get("presentador") or "").removeprefix("propio:")) else "",
-            # motor "blender": todas las escenas son planos 3D del personaje (solo en el PC con Blender)
-            "motor": "blender" if BLENDER_ACTIVO and o.get("motor") == "blender" else "",
-            "personaje": blender_gen.personaje(o.get("personaje")),
-            "escenario": o.get("escenario") if o.get("escenario") in blender_gen.ESCENARIOS else "mesa",
-            "calidad": "final" if o.get("calidad") == "final" else "borrador",
             "idioma": str(o.get("idioma") or "espanol")[:30],
             # saga: el video del que este es la continuacion (Dia 1 -> Dia 2...) y su numero de episodio
             "continua": o.get("continua") if re.fullmatch(r"[0-9a-f]{12}", str(o.get("continua") or "")) else "",
-            "episodio": max(1, int(o.get("episodio") or 1))}
+            "episodio": max(1, int(o.get("episodio") or 1)),
+            # temporada: lo que pasa en este episodio segun el plan que hizo Claude para toda la tanda
+            "rumbo": str(o.get("rumbo") or "").strip()[:700]}
 
 
 def crear(opciones):
     o = _opciones(opciones)
-    if o["motor"] == "blender" and blender_gen.disponible():
-        raise ValueError(blender_gen.disponible())
     if _propia(o):
         _audio_subido(o["voz"])   # falla ya si no esta
     elif not o["tema"]:
@@ -688,14 +609,148 @@ def siguiente_episodio(fid, idea=""):
     tema = f"Episodio {n} de «{s['titulo']}»" + (f": {idea}" if idea else "")
     # la voz grabada era de aquel video: el nuevo se narra con la voz por defecto
     voz = etapa_voz.DEFECTOS["voz"] if _propia(o) else o["voz"]
-    return crear({**o, "tema": tema, "voz": voz, "continua": fid, "episodio": n})
+    nuevo = crear({**o, "tema": tema, "voz": voz, "continua": fid, "episodio": n, "rumbo": ""})
+    if s.get("saga"):   # sigue en la misma saga (y lo que quedaba pendiente pasa a este)
+        _guardar(nuevo["id"], saga=s["saga"], saga_nombre=s.get("saga_nombre") or "", saga_despues=s.get("saga_despues") or "")
+    return _leer(nuevo["id"])
+
+
+def montar_saga(sid):
+    """Monta, de uno en uno y por orden de episodio, los episodios de una saga que esperan en revision."""
+    fids = sorted((s for s in listar() if s.get("saga") == sid and s.get("estado") == "revision"),
+                  key=lambda s: s["opciones"].get("episodio") or 1)
+    fids = [s["id"] for s in fids]
+    if not fids:
+        raise ValueError("no hay episodios de esta saga esperando a montar")
+    for n, fid in enumerate(fids, 1):
+        _guardar(fid, estado="en cola", progreso=0, error=None, mensaje=f"en cola: montar saga ({n} de {len(fids)})")
+
+    def correr():
+        for fid in fids:
+            try:
+                _producir(fid, "voz")
+            except Exception as e:  # noqa: BLE001 -- se ve en su tarjeta; sigue el siguiente
+                logger.exception(f"fabrica {fid} (montar saga {sid})")
+                _guardar(fid, estado="error", error=str(e)[:500], mensaje="")
+
+    hilo = threading.Thread(target=correr, daemon=True, name=f"fabrica-montar-{sid}")
+    with _candado:
+        for fid in fids:
+            _trabajos[fid] = hilo
+    hilo.start()
+    return {"videos": [_leer(f) for f in fids]}
+
+
+TEMPORADA_MAX = 10   # episodios por tanda
+
+
+def temporada(desde=None, opciones=None, cuantos=3, idea="", final=False, sin_parar=True):
+    """Varios episodios de una saga de una vez. Claude planea la tanda en una llamada corta (que pasa en cada uno y
+    hacia donde sigue despues); luego se hacen en orden: primero todos los guiones (cada uno ve los anteriores) y
+    despues voz y render, de uno en uno. desde = el ultimo episodio ya hecho (sigue de ahi) o None (saga nueva
+    con opciones["tema"]). final: la tanda cierra la historia; si no, el ultimo deja la puerta abierta.
+    sin_parar: en masa no se para a revisar ni a esperar clips: cada episodio sale montado."""
+    cuantos = min(TEMPORADA_MAX, max(1, int(cuantos or 3)))
+    idea = str(idea or "").strip()[:600]
+    if desde:
+        s = _leer(desde)
+        if not almacen.leer_json(_dir(desde, "guion.json")):
+            raise ValueError("este video aun no tiene guion: espera a que termine")
+        o = {**s["opciones"], "rumbo": ""}
+        if _propia(o) or o["voz"].startswith(NARRADA):   # la grabacion era de aquel video
+            o["voz"] = etapa_voz.DEFECTOS["voz"]
+        n0 = int(o.get("episodio") or 1) + 1
+        sid, nombre = s.get("saga") or desde, s.get("saga_nombre") or ""   # sin nombre: el que proponga Claude
+        antes, pendiente = _anteriores(desde), s.get("saga_despues") or ""
+    else:
+        o = _opciones(opciones)
+        if _propia(o):
+            raise ValueError("una temporada no puede usar una grabacion propia (es de un solo video)")
+        if not o["tema"]:
+            raise ValueError("escribe de que va la saga")
+        n0, sid, nombre, antes, pendiente = 1, uuid.uuid4().hex[:12], "", [], ""
+    if sin_parar:   # los prompts de video (clips) se siguen escribiendo; solo no se espera a subirlos
+        o = {**o, "revisar": False}
+    nicho = NICHOS[o["nicho"]]
+    prompt = (
+        f"Eres el guionista de una saga de videos cortos por entregas (nicho: {nicho['nombre']}, {o['idioma']}, "
+        f"unos {o['duracion']} s por episodio).\n"
+        + (f"La saga: {o['tema']}\n" if not antes else "Lo que ya se conto:\n" + "\n".join(antes) + "\n")
+        + (f"Lo que quedo pendiente para despues: {pendiente}\n" if pendiente else "")
+        + (f"Lo que quiere la persona para esta tanda: {idea}\n" if idea else "")
+        + f"Planea los episodios {n0} a {n0 + cuantos - 1} ({cuantos}). Cada uno: una situacion nueva que avanza la "
+        "historia (sin repetir lo ya contado), un peligro o problema que escala, y un final que deja intriga para el "
+        "siguiente. El mismo protagonista y las mismas reglas del mundo. "
+        + ("El ULTIMO episodio cierra la historia con un final claro." if final else
+           "El ultimo episodio NO cierra: deja la historia abierta para otra tanda.")
+        + "\nResponde SOLO con JSON: {\"saga\": \"nombre corto de la saga (2-5 palabras)\", \"episodios\": "
+        "[{\"titulo\": \"titulo del episodio (sigue la numeracion si la hay: Dia 3, Parte 2...)\", \"pasa\": \"que pasa, "
+        "2-3 frases: como empieza, que se complica y como acaba\"}], \"despues\": \"hacia donde puede seguir la historia "
+        "despues de esta tanda, 1-2 frases\"}")
+    plan = _objeto_json(claude_cli.ejecutar(prompt, modelo="sonnet", esfuerzo="low", tiempo_max_s=240)) or {}
+    eps = [e for e in plan.get("episodios") or [] if isinstance(e, dict) and _txt(e.get("pasa"))][:cuantos]
+    if not eps:
+        raise RuntimeError("Claude no devolvio el plan de la temporada: prueba otra vez")
+    nombre = nombre or _txt(plan.get("saga"), 60) or o["tema"][:60]
+    despues = "" if final else _txt(plan.get("despues"), 400)
+    fids, previo = [], desde or ""
+    for k, e in enumerate(eps):
+        n = n0 + k
+        titulo = _txt(e.get("titulo"), 90) or f"Episodio {n}"
+        oe = _opciones({**o, "tema": f"{nombre} — Episodio {n}: {titulo}", "continua": previo, "episodio": n,
+                        "rumbo": f"{titulo}. {_txt(e.get('pasa'), 600)}"})
+        if sin_parar:
+            oe["revisar"] = False   # _opciones lo vuelve a encender si hay clips
+        fid = sid if not desde and k == 0 else uuid.uuid4().hex[:12]   # la saga se llama como su primer video
+        os.makedirs(_dir(fid), exist_ok=True)
+        almacen.escribir_json(_dir(fid, "sesion.json"), {
+            "id": fid, "titulo": oe["tema"][:120], "opciones": oe, "creado": time.time() + k * 0.001,
+            "actualizado": time.time(), "estado": "en cola", "progreso": 0,
+            "mensaje": f"en cola: episodio {n} ({k + 1} de {len(eps)})", "error": None,
+            "saga": sid, "saga_nombre": nombre, "saga_despues": despues if k == len(eps) - 1 else ""})
+        fids.append(fid)
+        previo = fid
+    if desde:
+        _guardar(desde, saga=sid, saga_nombre=nombre)
+
+    def correr():
+        hechos = []
+        for k, fid in enumerate(fids):   # 1) los guiones, en orden (cada uno lee el anterior)
+            try:
+                _guion(fid)
+                hechos.append(fid)
+                _guardar(fid, estado="revision" if o.get("revisar") else "en cola", progreso=12,
+                         mensaje="guion e imagenes listos: revisa y dale a Montar" if o.get("revisar")
+                         else "guion listo: espera su turno para la voz y el render")
+            except Exception as e:  # noqa: BLE001 -- sin este guion los siguientes no saben como sigue
+                logger.exception(f"fabrica {fid} (temporada {sid})")
+                _guardar(fid, estado="error", error=str(e)[:500], mensaje="")
+                for resto in fids[k + 1:]:
+                    _guardar(resto, estado="error", mensaje="",
+                             error="El episodio anterior fallo: rehazlo y luego dale a Rehacer desde guion a este.")
+                break
+        if o.get("revisar"):
+            return
+        for fid in hechos:   # 2) voz, escenas y montaje
+            try:
+                _producir(fid, "voz")
+            except Exception as e:  # noqa: BLE001 -- se ve en su tarjeta; sigue el siguiente
+                logger.exception(f"fabrica {fid} (temporada {sid})")
+                _guardar(fid, estado="error", error=str(e)[:500], mensaje="")
+
+    hilo = threading.Thread(target=correr, daemon=True, name=f"fabrica-temporada-{sid}")
+    with _candado:
+        for fid in fids:
+            _trabajos[fid] = hilo
+    hilo.start()
+    return {"saga": sid, "nombre": nombre, "despues": despues, "videos": [_leer(f) for f in fids]}
 
 
 # ------------------------------------------------------------------ moldes
 # Las opciones de un video que funciono (estilo, formato, duracion, efectos, receta...) guardadas con un nombre:
 # al usarlo se rellena todo y solo se cambia el tema, la musica o la voz.
 RUTA_MOLDES = almacen.raiz("fabrica_moldes.json")
-MOLDE_FUERA = ("tema", "continua", "episodio")   # lo que es de cada video, no del molde
+MOLDE_FUERA = ("tema", "continua", "episodio", "rumbo")   # lo que es de cada video, no del molde
 
 
 def moldes():
@@ -727,10 +782,30 @@ SAGA_MAX = 6   # episodios anteriores que ve Claude (el ultimo entero, los demas
 
 
 def _saga(o):
-    """Lo que Claude necesita para seguir la historia: los episodios anteriores, del mas viejo al ultimo."""
+    """Lo que Claude necesita para seguir la historia: los episodios anteriores (del mas viejo al ultimo) y, en una
+    temporada, lo que el plan dice que pasa en este."""
+    rumbo = (f"Lo que pasa en ESTE episodio (plan de la temporada, cuentalo con detalle): {o['rumbo']}\n"
+             if o.get("rumbo") else "")
     if not o.get("continua"):
-        return ""
-    cadena, fid = [], o["continua"]
+        return (f"SAGA: este video es el EPISODIO {o['episodio']} de una historia por entregas. " + rumbo
+                + "Presenta al protagonista y su mundo con claridad y cierra dejando intriga para el siguiente.\n\n"
+                if rumbo else "")
+    partes, ultimo = _anteriores(o["continua"], con_guion=True)
+    prota = next((e.get("protagonista") for e in ultimo.get("escenas") or [] if e.get("tipo") == "portada" and e.get("protagonista")), None)
+    return (
+        f"SAGA: este video es el EPISODIO {o['episodio']} de una historia por entregas. Lo que ya se conto:\n"
+        + "\n".join(partes) + "\n" + rumbo +
+        "Sigue la historia JUSTO donde termino el ultimo episodio: el mismo protagonista, el mismo mundo y sus reglas, "
+        "y lo que ya paso cuenta (no lo repitas ni lo contradigas). Si los titulos llevan numeracion (Dia 1, Parte 1, "
+        "Regla #3...), sigue con la siguiente; si no, la portada dice el episodio. Abre con una frase que recuerde donde "
+        "nos quedamos y cierra dejando intriga para el siguiente episodio. Mismo tono, mismo tipo de gancho, mismo ritmo.\n"
+        + (f"La portada lleva el mismo protagonista: {json.dumps(prota, ensure_ascii=False)}.\n" if prota else "")
+        + "\n")
+
+
+def _anteriores(fid, con_guion=False):
+    """Los episodios hasta fid (incluido), del mas viejo al ultimo: el ultimo entero, los demas resumidos."""
+    cadena = []
     while fid and len(cadena) < SAGA_MAX:
         try:
             s = _leer(fid)
@@ -747,16 +822,7 @@ def _saga(o):
             texto = texto[:400] + ("…" if len(texto) > 400 else "")
         partes.append(f"- Episodio {s['opciones'].get('episodio') or 1}: «{g.get('titulo') or s['titulo']}»\n  {texto}")
     ultimo = cadena[-1][1] if cadena else {}
-    prota = next((e.get("protagonista") for e in ultimo.get("escenas") or [] if e.get("tipo") == "portada" and e.get("protagonista")), None)
-    return (
-        f"SAGA: este video es el EPISODIO {o['episodio']} de una historia por entregas. Lo que ya se conto:\n"
-        + "\n".join(partes) + "\n"
-        "Sigue la historia JUSTO donde termino el ultimo episodio: el mismo protagonista, el mismo mundo y sus reglas, "
-        "y lo que ya paso cuenta (no lo repitas ni lo contradigas). Si los titulos llevan numeracion (Dia 1, Parte 1, "
-        "Regla #3...), sigue con la siguiente; si no, la portada dice el episodio. Abre con una frase que recuerde donde "
-        "nos quedamos y cierra dejando intriga para el siguiente episodio. Mismo tono, mismo tipo de gancho, mismo ritmo.\n"
-        + (f"La portada lleva el mismo protagonista: {json.dumps(prota, ensure_ascii=False)}.\n" if prota else "")
-        + "\n")
+    return (partes, ultimo) if con_guion else partes
 
 
 LOTE_MAX = 30
@@ -814,7 +880,7 @@ VERSIONES_MAX = 14   # dibujos que un video puede pasar a otra familia (cada uno
 
 
 def _versiones(fid, guion):
-    """Con un aspecto elegido (foto, acuarela...), los dibujos del guion que aun no lo tienen se generan en ese
+    """Con un aspecto elegido (stickman, grabado...), los dibujos del guion que aun no lo tienen se generan en ese
     aspecto con Nano Banana (solo local) y quedan para los siguientes videos. Sin Flow se usan los que haya."""
     o = _leer(fid)["opciones"]
     familia = _familia(o)
@@ -1108,6 +1174,9 @@ CAPITULO_S = 50       # segundos de narracion por capitulo (una llamada a Claude
 def _nuevas_max(o):
     """Dibujos nuevos que puede pedir un video: pocos en mapas (se reusan pegatinas de sitios); fuera de mapas, mas,
     y en los largos uno cada ~10 s (con tope: cada uno son ~45 s en Flow)."""
+    estilo = ESTILOS.get(o.get("estilo")) or {}
+    if estilo.get("nuevas") and o["duracion"] <= LARGO_S:
+        return estilo["nuevas"]
     if o["nicho"] == "mapas":
         return NUEVOS_MAX if o["duracion"] <= LARGO_S else min(12, o["duracion"] // 30)
     return NUEVOS_MAX_UNICOS if o["duracion"] <= LARGO_S else min(40, o["duracion"] // 10)
@@ -1170,8 +1239,8 @@ def _guion(fid):
     nicho = NICHOS[o["nicho"]]
     _guardar(fid, estado="guion", progreso=3, mensaje="Claude escribe el guion y las escenas")
     palabras = int(o["duracion"] * 2.2)  # Alvaro dice ~2,15 palabras/s
-    blender = o.get("motor") == "blender"
-    permitidas = list(ESCENAS_3D) if blender else nicho["escenas"]
+    estilo = ESTILOS.get(o.get("estilo")) or {}
+    permitidas = estilo.get("escenas") or nicho["escenas"]
     catalogo_txt = "\n".join(f'- "{t}": {ESCENAS[t]["descripcion"]} Campos: {ESCENAS[t]["campos"]}' for t in permitidas)
     dibujos = biblioteca.para_claude(o["nicho"])
     grabada = almacen.leer_json(_dir(fid, "voz", "palabras.json")) if _propia(o) else None
@@ -1189,18 +1258,20 @@ def _guion(fid):
         encargo = (
             f"Tema: {o['tema']}\nIdioma de la narracion y los textos: {o['idioma']}.\n"
             f"Duracion: unos {o['duracion']} s, o sea unas {palabras} palabras de narracion en total "
-            f"(unas {max(4, round(o['duracion'] / 6))} escenas de 12-20 palabras). Cuenta las palabras antes de responder: "
+            f"(unas {max(4, round(palabras / _media(estilo.get('palabras', '12-20'))))} escenas de {estilo.get('palabras', '12-20')} "
+            "palabras). Cuenta las palabras antes de responder: "
             "si te quedas corto, añade escenas con mas datos; no rellenes.\n\n")
     serie = SERIES.get(o.get("serie") or "")
     hechos = _hechos(o["nicho"], fid)
     # fuera de mapas cada escena lleva su propia imagen (si se pueden hacer: Flow en este PC)
-    unicos = o["nicho"] != "mapas" and o["nuevos"] and flow_gen.habilitado() and not blender
+    unicos = o["nicho"] != "mapas" and o["nuevos"] and flow_gen.habilitado()
     largo = not grabada and o["duracion"] > LARGO_S
     nuevas_max = _nuevas_max(o)
     cabeza = (
         (f"Eres guionista y director de videos largos para YouTube (se ven hasta el final si cada minuto deja una "
          f"intriga). {nicho['guia']}\n\n" if largo else f"Eres guionista y director de videos cortos para redes. {nicho['guia']}\n\n")
         + (f"{serie['guia']}\n\n" if serie else "")
+        + (f"{estilo['guia']}\n\n" if estilo.get("guia") else "")
         + (clonar.para_guion(o["receta"]) if o.get("receta") else "")
         + _saga(o)
     )
@@ -1212,23 +1283,21 @@ def _guion(fid):
         "poblacion, anos que pasan...): en la raiz \"indicador\": {\"nombre\": \"Costa de Bolivia\", \"antes\"?: \"$\", "
         "\"despues\"?: \" km\"} y en las escenas donde cambia \"indicador\": {\"valor\": 400, \"palabra\": \"...\"}. Se queda "
         "visible en una esquina el resto del video y cuenta hasta el nuevo valor al decir la palabra.\n\n"
-        + (BARRO_GUIA + "CATALOGO 3D (para 'tamanos'):\n" + modelos3d.para_claude() + "\n\n" if blender
-           else f"Biblioteca de pegatinas (id y que es): {dibujos['pegatinas'] or '(vacia)'}\n")
-        + ("" if blender else "IMAGENES UNICAS: en este video cada escena 'ilustracion' lleva su PROPIA imagen nueva: pon siempre "
+        + f"Biblioteca de pegatinas (id y que es): {dibujos['pegatinas'] or '(vacia)'}\n"
+        + ("IMAGENES UNICAS: en este video cada escena 'ilustracion' lleva su PROPIA imagen nueva: pon siempre "
            "\"nueva\" con la descripcion EN INGLES de exactamente ese momento (encuadre y accion distintos en cada una: "
            "primer plano, plano general, detalle, desde arriba...) e \"imagen\": \"\". Nunca dos ilustraciones iguales. "
            f"Usa ilustraciones para la mayoria de momentos (hasta {nuevas_max} en todo el video); 'protagonista' como "
            f"mucho {PROTA_MAX} veces, y para enseñar al protagonista en otra situacion, una ilustracion nueva de el.\n\n"
            if unicos else f"Biblioteca de ilustraciones (id y que es): {dibujos['ilustraciones'] or '(vacia)'}\n\n")
-        + ("" if blender else banco.para_guion(o.get("banco") or [], o.get("banco_modo")))
+        + banco.para_guion(o.get("banco") or [], o.get("banco_modo"))
     )
     reglas = (
         "Reglas:\n"
-        "- El guion se parte en escenas seguidas; cada una con su 'texto' (lo que dice la voz en esa escena, 1-3 frases, "
-        "3-8 s). La narracion completa es la union de los textos, en orden.\n"
-        + ("- Todas las escenas son 3D (" + ", ".join(f"'{t}'" for t in ESCENAS_3D) + "); mezcla tipos (no 3 iguales "
-           "seguidas) y la primera lleva 'titulo'. Su texto es el gancho:" if blender else
-           "- La primera escena es 'portada' y su texto es el gancho:") + " lo que decide si siguen mirando o pasan, asi que "
+        f"- El guion se parte en escenas seguidas; cada una con su 'texto' (lo que dice la voz en esa escena, "
+        f"{'una frase' if estilo.get('segundos') == '2-3' else '1-3 frases'}, {estilo.get('segundos', '3-8')} s). "
+        "La narracion completa es la union de los textos, en orden.\n"
+        + "- La primera escena es 'portada' y su texto es el gancho: lo que decide si siguen mirando o pasan, asi que "
         "lo fuerte va en los 3 primeros segundos (las 6-7 primeras palabras). Abre una pregunta que solo se cierra "
         "al final: un dato que choca, algo que contradice lo que todos creen, o una pregunta concreta con nombre "
         "propio o cifra. Maximo 12 palabras. Prohibido empezar con saludos, 'hoy te cuento', 'en este video', "
@@ -1276,16 +1345,62 @@ def _guion(fid):
             '"escenas": [{"tipo": "portada", "texto": "...", ...campos de su tipo}]}'
         )
         crudo = _objeto_json(claude_cli.ejecutar(prompt, modelo="sonnet", esfuerzo="low", tiempo_max_s=300))
-    if o["nuevos"] and flow_gen.habilitado() and not blender:
+        if not grabada:
+            crudo = _ajustar_largo(fid, crudo, palabras, o["duracion"])
+    if o["nuevos"] and flow_gen.habilitado():
         if o["nicho"] != "mapas":
             _unicos(fid, crudo)
         _dibujos_nuevos(fid, crudo)
     guion = _validar(crudo, o["nicho"], permitidas, o.get("banco"))
+    if estilo.get("guia") and _txt(crudo.get("cabecera")):
+        guion["cabecera"] = _txt(crudo["cabecera"], 40)
     if grabada:
         guion = _encajar(guion, grabada["palabras"])
     almacen.escribir_json(_dir(fid, "guion.json"), guion)
     _guardar(fid, titulo=guion["titulo"] or o["tema"][:120] or "Video", progreso=26 if grabada else 12,
              mensaje=f"guion listo: {len(guion['escenas'])} escenas")
+
+
+LARGO_TOLERANCIA = 0.10   # fuera de +-10 % de las palabras pedidas se pide a Claude que corrija (una vez)
+
+
+def _media(rango):
+    """'8-14' -> 11 (palabras por escena)."""
+    a, _, b = str(rango).partition("-")
+    return (int(a) + int(b or a)) / 2
+
+
+def _palabras_de(crudo):
+    return sum(len(str(e.get("texto") or "").split()) for e in (crudo.get("escenas") or []) if isinstance(e, dict))
+
+
+def _ajustar_largo(fid, crudo, objetivo, duracion):
+    """Claude suele quedarse corto (~70 % de lo pedido): si el guion se aleja de la duracion, una sola llamada
+    mas para alargarlo o recortarlo. Solo cuesta cuando hace falta."""
+    n = _palabras_de(crudo)
+    if not n or abs(n - objetivo) <= objetivo * LARGO_TOLERANCIA:
+        return crudo
+    falta = objetivo - n
+    _guardar(fid, mensaje=f"ajustando el guion a {duracion} s ({n} de {objetivo} palabras)")
+    orden = (f"Le FALTAN unas {falta} palabras: anade escenas nuevas (con datos reales que empujen el mensaje, del mismo "
+             "formato y campos) y alarga textos cortos; no rellenes ni repitas." if falta > 0 else
+             f"Le SOBRAN unas {-falta} palabras: quita lo menos importante y acorta textos, sin perder el gancho ni el final.")
+    prompt = (
+        f"Este guion de video tiene {n} palabras de narracion (la suma de los 'texto' de las escenas), pero debe durar "
+        f"{duracion} s = unas {objetivo} palabras. {orden} Mantén la portada, el mensaje, los colores, el estilo y las "
+        "mismas reglas de campos ('palabra' debe aparecer tal cual en el texto de su escena). Cuenta las palabras antes "
+        f"de responder: el total debe quedar entre {round(objetivo * 0.95)} y {round(objetivo * 1.05)}.\n\n"
+        "Responde SOLO con el JSON completo corregido, mismo formato:\n" + json.dumps(crudo, ensure_ascii=False))
+    try:
+        nuevo = _objeto_json(claude_cli.ejecutar(prompt, modelo="sonnet", esfuerzo="low", tiempo_max_s=300))
+    except Exception as ex:   # si falla, se sigue con el primero
+        logger.warning(f"fabrica {fid}: no se pudo ajustar el largo: {ex}")
+        return crudo
+    m = _palabras_de(nuevo)
+    if not nuevo.get("escenas") or abs(m - objetivo) >= abs(n - objetivo):
+        return crudo
+    logger.info(f"fabrica {fid}: guion ajustado {n} -> {m} palabras (objetivo {objetivo})")
+    return nuevo
 
 
 def _encajar(guion, oidas):
@@ -1337,6 +1452,8 @@ def _dibujos_nuevos(fid, guion):
         for p in (e.get("pegatinas") or []) if e.get("tipo") == "mapa" else []:
             if isinstance(p, dict) and _txt(p.get("nueva")):
                 pedidos.append(("pegatinas", p, "id", "objeto" if p.get("clase") == "objeto" else "personaje"))
+        if e.get("tipo") == "portada" and _txt(e.get("nueva")):   # su imagen de fondo (Retro TV, Thriller)
+            pedidos.append(("ilustraciones", e, "imagen", "personaje"))
         p = e.get("protagonista")
         if e.get("tipo") == "portada" and isinstance(p, dict) and _txt(p.get("nueva")):
             pedidos.append(("pegatinas", p, "id", "personaje"))
@@ -1483,6 +1600,8 @@ def _validar(guion, nicho, permitidas=None, bancos=None):
                      protagonista=dibujo("pegatinas", (e.get("protagonista") or {}).get("id"))
                      if isinstance(e.get("protagonista"), dict) else None)
             prota = x["protagonista"]
+            if e.get("imagen"):   # Retro TV / Thriller: la primera ilustracion de fondo
+                x["imagen"] = dibujo("ilustraciones", e.get("imagen"))
             lugar = e.get("lugar") if isinstance(e.get("lugar"), dict) else {}
             lon, lat = _num(lugar.get("lon")), _num(lugar.get("lat"))
             if lon is not None and lat is not None and -180 <= lon <= 180 and -85 <= lat <= 85:
@@ -1611,90 +1730,6 @@ def _validar(guion, nicho, permitidas=None, bancos=None):
                 x["mensajes"] = [{"texto": x["contenido"], "mio": False, "palabra": x["palabra"]}]
             if not (x["mensajes"] if x["forma"] in ("chat", "notificacion") else x["contenido"]):
                 e = {**e, "tipo": "_sin_contenido"}
-        elif x["tipo"] == "barro":
-            x["camara"] = e.get("camara") if e.get("camara") in blender_gen.CAMARAS else "medio"
-            x["gesto"] = e.get("gesto") if e.get("gesto") in blender_gen.GESTOS else "habla"
-            x["cara"] = e.get("cara") if e.get("cara") in blender_gen.CARAS else "normal"
-            x["objetos"] = [{"tipo": b["tipo"], "texto": _txt(b.get("texto"), 20)}
-                            for b in (e.get("objetos") or [])[:2] if isinstance(b, dict) and b.get("tipo") in blender_gen.OBJETOS]
-            x["titulo"] = _txt(e.get("titulo"), 80) if not escenas else ""
-            g = e.get("golpe")
-            x["golpe"] = {"texto": _txt(g.get("texto"), 30), "palabra": _txt(g.get("palabra"), 40)} if isinstance(g, dict) and _txt(g.get("texto")) else None
-        elif x["tipo"] == "tamanos":
-            obs = []
-            for o in (e.get("objetos") or [])[:6]:
-                alto = _num(str(o.get("alto_m")).replace(",", ".")) if isinstance(o, dict) else None
-                if alto and alto > 0 and modelos3d.valido(str(o.get("modelo") or "")) and _txt(o.get("nombre")):
-                    obs.append({"nombre": _txt(o["nombre"], 30), "texto": _txt(o.get("texto"), 20), "modelo": o["modelo"],
-                                "alto_m": alto, "palabra": _txt(o.get("palabra"), 40),
-                                **({"color": TONOS_3D[o["color"]]} if o.get("color") in TONOS_3D else {})})
-            x["objetos"] = sorted(obs, key=lambda o: o["alto_m"])
-            x["titulo"] = _txt(e.get("titulo"), 80) if not escenas else ""
-            g = e.get("golpe")
-            x["golpe"] = {"texto": _txt(g.get("texto"), 30), "palabra": _txt(g.get("palabra"), 40)} if isinstance(g, dict) and _txt(g.get("texto")) else None
-            if len(x["objetos"]) < 2:
-                e = {**e, "tipo": "_sin_objetos"}
-        elif x["tipo"] == "datos3d":
-            x["modo"] = "pilas" if e.get("modo") == "pilas" else "columnas"
-            x["datos"] = []
-            for b in (e.get("datos") or [])[:6]:
-                valor = _num(str(b.get("valor")).replace(",", ".")) if isinstance(b, dict) else None
-                if valor is not None and valor >= 0 and _txt(b.get("etiqueta")):
-                    x["datos"].append({"etiqueta": _txt(b["etiqueta"], 16), "valor": valor, "texto": _txt(b.get("texto"), 14),
-                                       "palabra": _txt(b.get("palabra"), 40)})
-            x["titulo"] = _txt(e.get("titulo"), 80) if not escenas else ""
-            g = e.get("golpe")
-            x["golpe"] = {"texto": _txt(g.get("texto"), 30), "palabra": _txt(g.get("palabra"), 40)} if isinstance(g, dict) and _txt(g.get("texto")) else None
-            if len(x["datos"]) < 2:
-                e = {**e, "tipo": "_sin_datos"}
-        elif x["tipo"] == "titulo3d":
-            x["titulo3d"] = _txt(e.get("titulo") or e.get("texto3d"), 70)
-            x["ambiente"] = e.get("ambiente") if e.get("ambiente") in ("claro", "oscuro", "color") else "claro"
-            x["titulo"] = ""   # el titulo ES la escena: nada encima
-            if escenas or not x["titulo3d"]:
-                e = {**e, "tipo": "_solo_primera"}
-        elif x["tipo"] == "globo":
-            x["paradas"] = []
-            for q in (e.get("paradas") or [])[:4]:
-                iso = str(q.get("iso") or "").upper() if isinstance(q, dict) else ""
-                if iso in _paises():
-                    x["paradas"].append({"iso": iso, "texto": _txt(q.get("texto") or _paises()[iso]["n"], 22),
-                                         "palabra": _txt(q.get("palabra"), 40)})
-            x["titulo"] = _txt(e.get("titulo"), 80) if not escenas else ""
-            g = e.get("golpe")
-            x["golpe"] = {"texto": _txt(g.get("texto"), 30), "palabra": _txt(g.get("palabra"), 40)} if isinstance(g, dict) and _txt(g.get("texto")) else None
-            if not x["paradas"]:
-                e = {**e, "tipo": "_sin_paradas"}
-        elif x["tipo"] == "objeto":
-            x["modelo"] = str(e.get("modelo") or "")
-            x["texto3d"] = _txt(e.get("texto3d") or e.get("texto_3d"), 18)
-            x["ambiente"] = e.get("ambiente") if e.get("ambiente") in ("claro", "oscuro", "color") else "claro"
-            x["palabra"] = _txt(e.get("palabra"), 40)
-            x["titulo"] = _txt(e.get("titulo"), 80) if not escenas else ""
-            g = e.get("golpe")
-            x["golpe"] = {"texto": _txt(g.get("texto"), 30), "palabra": _txt(g.get("palabra"), 40)} if isinstance(g, dict) and _txt(g.get("texto")) else None
-            if x["modelo"] in modelos3d.FORMAS or not modelos3d.valido(x["modelo"]):
-                e = {**e, "tipo": "_sin_modelo"}
-        elif x["tipo"] == "diorama":
-            x["tema"] = e.get("tema") if e.get("tema") in ("ciudad", "pueblo", "bosque", "nieve", "desierto") else "pueblo"
-            x["hora"] = "noche" if e.get("hora") == "noche" else "dia"
-            x["texto3d"] = _txt(e.get("texto3d") or e.get("texto_3d"), 18)
-            x["palabra"] = _txt(e.get("palabra"), 40)
-            x["titulo"] = _txt(e.get("titulo"), 80) if not escenas else ""
-            g = e.get("golpe")
-            x["golpe"] = {"texto": _txt(g.get("texto"), 30), "palabra": _txt(g.get("palabra"), 40)} if isinstance(g, dict) and _txt(g.get("texto")) else None
-        elif x["tipo"] == "fisicas":
-            x["fisica"] = e.get("tipo_fisica") or e.get("fisica") or e.get("modo")
-            x["fisica"] = x["fisica"] if x["fisica"] in blender_gen.FISICAS else "lluvia"
-            x["objeto"] = e.get("objeto") if e.get("objeto") in blender_gen.PIEZAS else "moneda"
-            x["cantidad"] = int(min(150, max(20, _num(e.get("cantidad")) or 80)))
-            nivel = _num(str(e.get("nivel") or "").replace(",", "."))
-            x["nivel"] = min(1.0, max(0.05, nivel / 100 if nivel and nivel > 1 else nivel or 0.7))
-            x["texto3d"] = _txt(e.get("texto3d") or e.get("cifra") or (e.get("texto_3d")), 14)
-            x["palabra"] = _txt(e.get("palabra"), 40)
-            x["titulo"] = _txt(e.get("titulo"), 80) if not escenas else ""
-            g = e.get("golpe")
-            x["golpe"] = {"texto": _txt(g.get("texto"), 30), "palabra": _txt(g.get("palabra"), 40)} if isinstance(g, dict) and _txt(g.get("texto")) else None
         elif x["tipo"] == "linea_tiempo":
             x["titulo"] = _txt(e.get("titulo"), 80)
             x["hitos"] = [{"fecha": _txt(h["fecha"], 16), "texto": _txt(h.get("texto"), 60), "palabra": _txt(h.get("palabra") or h["fecha"], 40),
@@ -1702,7 +1737,7 @@ def _validar(guion, nicho, permitidas=None, bancos=None):
             if len(x["hitos"]) < 2:
                 e = {**e, "tipo": "_sin_hitos"}
         extras = [_extra(t) for t in (e.get("extras") or [])[:2] if isinstance(t, dict)] \
-            if x["tipo"] != "portada" and not (x["tipo"] in ESCENAS_3D and x.get("titulo")) else []
+            if x["tipo"] != "portada" else []
         if any(extras):
             x["extras"] = [t for t in extras if t]
         if e["tipo"] != x["tipo"]:
@@ -1785,8 +1820,6 @@ def _voz(fid):
     if o["voz"].startswith(NARRADA):
         return _voz_narrada(fid, o, texto, audio)
     _guardar(fid, estado="voz", progreso=15, mensaje=f"sintetizando la voz ({o['voz']})")
-    if o["voz"].startswith("clon:"):
-        return _voz_clonada(fid, o, texto, carpeta, audio)
     nombre = voice.parse_voice_name(o["voz"])
     if componentes.es_voz_microsoft(nombre):
         componentes.comprobar_edge_tts(nombre)
@@ -1864,42 +1897,6 @@ def _voz_narrada(fid, o, texto, audio):
     _guardar(fid, progreso=22, mensaje=f"tu voz lista: {duracion:.1f} s")
 
 
-class _CtxClon:
-    """Lo minimo que pide voz_clonada.sintetizar (viene de las etapas del estudio)."""
-    def __init__(self, fid):
-        self.fid = fid
-
-    def dir(self, *partes):   # solo pide carpetas (voz/clon: cache de bloques)
-        ruta = _dir(self.fid, *partes)
-        os.makedirs(ruta, exist_ok=True)
-        return ruta
-
-    def avisar(self, mensaje=None, progreso=None):
-        if mensaje:
-            _guardar(self.fid, mensaje=mensaje, **({"progreso": int(15 + progreso * 0.06)} if progreso is not None else {}))
-
-    def cancelado(self):
-        return False
-
-
-def _voz_clonada(fid, o, texto, carpeta, audio):
-    """Voz del servidor de clonacion: no trae tiempos por palabra, asi que Whisper los saca del audio hecho."""
-    wav = os.path.join(carpeta, "clon.wav")
-    voz_clonada.sintetizar(_CtxClon(fid), texto, o["voz"][len("clon:"):], IDIOMAS_CLON.get(o["idioma"], "es"), wav)
-    filtro = ["-filter:a", f"atempo={o['velocidad']}"] if abs(o["velocidad"] - 1.0) > 1e-3 else []
-    r = medios.correr([medios.ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-i", wav, *filtro,
-                       "-c:a", "libmp3lame", "-q:a", "2", audio], timeout=900)
-    if r.returncode != 0 or not os.path.isfile(audio):
-        raise RuntimeError(f"ffmpeg no pudo convertir la voz clonada: {r.stderr[-300:]}")
-    os.remove(wav)
-    duracion = float(medios.sondear(audio).get("duracion") or 0)
-    alineadas = etapa_voz.alinear(texto, _escuchar(fid, audio, duracion, 18, 22, o["idioma"]))
-    if not alineadas:
-        raise RuntimeError("la voz clonada no se parece al guion (revisa el idioma de la voz)")
-    almacen.escribir_json(os.path.join(carpeta, "palabras.json"), {"duracion": round(duracion, 3), "palabras": alineadas[0]})
-    _guardar(fid, progreso=22, mensaje=f"voz lista: {duracion:.1f} s")
-
-
 # ------------------------------------------------------------------ 3. plan
 
 def _norm(s):
@@ -1961,9 +1958,8 @@ def plan(fid):
     indicador = None                              # ultimo valor del indicador fijo (None: aun no ha salido)
     semilla = int(fid[:6], 16) if re.fullmatch(r"[0-9a-f]{6,}", fid[:6]) else 0
     vistos = {}                                   # escenas de cada tipo ya repartidas (para rotar su composicion)
-    # en los videos de Blender el que habla es el muneco: sin presentador encima
     presentador = None
-    if o.get("motor") != "blender" and o.get("presentador"):
+    if o.get("presentador"):
         if o["presentador"] in PRESENTADORES:
             presentador = {"aspecto": PRESENTADORES[o["presentador"]]["aspecto"]}
         else:
@@ -1974,8 +1970,7 @@ def plan(fid):
                 with open(ruta_pres, "rb") as f_:
                     nombre_pres = f"pres_{hashlib.sha1(f_.read()).hexdigest()[:12]}.webp"
                 presentador = {"aspecto": presentadores.aspecto(pid), "imagen": nombre_pres, "ruta": ruta_pres}
-    con_barro = any(e["tipo"] == "barro" for e in guion["escenas"])
-    boca = _niveles_boca(_dir(fid, "voz", "voz.mp3"), fin) if presentador or con_barro else ""
+    boca = _niveles_boca(_dir(fid, "voz", "voz.mp3"), fin) if presentador else ""
     puntos = o.get("estilo") == "explicador" or o.get("serie") == "explicador"   # cortinilla de tinta en los cambios grandes
     for i, (e, trozo) in enumerate(zip(guion["escenas"], trozos)):
         a = inicios[i]
@@ -1988,12 +1983,16 @@ def plan(fid):
             return round(trozo[j][0] - a, 3) if j is not None else defecto
 
         d = {"subtitulos": rel if o["subtitulos"] else []}
+        if o.get("estilo") == "retrotv":   # cabecera con el tema y el contador de escenas
+            d["cabecera"] = {"texto": guion.get("cabecera") or guion.get("titulo") or "", "n": i + 1, "total": len(guion["escenas"])}
         if e["tipo"] == "portada":
             # en una serie, su nombre va siempre encima del titulo (asi se reconoce de un video a otro)
             serie = SERIES.get(o.get("serie") or "")
             d.update(titulo=e["titulo"], antetitulo=serie["antetitulo"] if serie else e.get("antetitulo") or "")
             lugar = e.get("lugar")
-            if e.get("protagonista") and not e.get("paises") and not lugar:
+            if e.get("imagen") and not e.get("paises") and not lugar:
+                d["fondo_img"] = _archivo(archivos, "ilustraciones", e["imagen"], familia)
+            elif e.get("protagonista") and not e.get("paises") and not lugar:
                 d["protagonista"] = _archivo(archivos, "pegatinas", e["protagonista"], familia)
             if e.get("paises") or lugar:
                 # cada pais con el color que tendra en los mapas del video (asi no cambia de color al seguir)
@@ -2122,96 +2121,6 @@ def plan(fid):
             d["rotulo"] = {"texto": e["rotulo"]["texto"], "a": en(e["rotulo"]["palabra"])} if e.get("rotulo") else None
             previa, pintados = None, set()
             sonidos.append((a, "whoosh"))
-            if d["golpe"]:
-                sonidos.append((a + d["golpe"]["a"], "golpe"))
-        elif e["tipo"] == "barro":
-            # Blender pinta el plano (blender_gen) y esta escena solo pone encima los textos sobre verde croma
-            f0 = round(a * FPS)
-            d["clip"] = True
-            d["barro"] = {"camara": e["camara"], "gesto": e["gesto"], "cara": e["cara"], "objetos": e["objetos"],
-                          "boca": boca[f0:f0 + round(dur * FPS) + 1], "semilla": semilla + i}
-            if e.get("titulo"):
-                d["titulo"] = e["titulo"]
-                d["subtitulos"] = []   # el gancho ya esta escrito en grande
-            d["golpe"] = {"texto": e["golpe"]["texto"], "a": en(e["golpe"]["palabra"])} if e.get("golpe") else None
-            previa, pintados = None, set()
-            sonidos.append((a, "whoosh"))
-            if d["golpe"]:
-                sonidos.append((a + d["golpe"]["a"], "golpe"))
-        elif e["tipo"] == "tamanos":
-            d["clip"] = True
-            objs = [{**{k: o[k] for k in ("nombre", "texto", "modelo", "alto_m", "color") if k in o},
-                     "a": min(en(o.get("palabra"), 0.3 + k * 0.9), round(max(0.0, dur - 0.6), 3))} for k, o in enumerate(e["objetos"])]
-            d["tres_d"] = {"script": "tamanos", "objetos": objs, "semilla": semilla + i}
-            if e.get("titulo"):
-                d["titulo"] = e["titulo"]
-                d["subtitulos"] = []
-            d["golpe"] = {"texto": e["golpe"]["texto"], "a": en(e["golpe"]["palabra"])} if e.get("golpe") else None
-            previa, pintados = None, set()
-            sonidos.append((a, "whoosh"))
-            sonidos += [(a + o["a"], "pop") for o in objs]
-            if d["golpe"]:
-                sonidos.append((a + d["golpe"]["a"], "golpe"))
-        elif e["tipo"] == "datos3d":
-            d["clip"] = True
-            vals = [{**{k: b[k] for k in ("etiqueta", "valor", "texto")},
-                     "a": min(en(b.get("palabra"), 0.3 + k * 0.8), round(max(0.0, dur - 1.2), 3))} for k, b in enumerate(e["datos"])]
-            d["tres_d"] = {"script": "datos3d", "modo": e["modo"], "datos": vals}
-            if e.get("titulo"):
-                d["titulo"] = e["titulo"]
-                d["subtitulos"] = []
-            d["golpe"] = {"texto": e["golpe"]["texto"], "a": en(e["golpe"]["palabra"])} if e.get("golpe") else None
-            previa, pintados = None, set()
-            sonidos.append((a, "whoosh"))
-            sonidos += [(a + v["a"], "pop") for v in vals]
-            if d["golpe"]:
-                sonidos.append((a + d["golpe"]["a"], "golpe"))
-        elif e["tipo"] == "titulo3d":
-            d["clip"] = True
-            d["tres_d"] = {"script": "titulo3d", "texto": e["titulo3d"], "ambiente": e["ambiente"], "a": 0.0}
-            d["subtitulos"] = []   # el gancho ya esta escrito en grande
-            d["golpe"] = None
-            previa, pintados = None, set()
-            sonidos += [(a, "whoosh"), (a + 0.35, "golpe")]
-        elif e["tipo"] in ("globo", "objeto", "diorama"):
-            d["clip"] = True
-            if e["tipo"] == "diorama":
-                d["tres_d"] = {"script": "diorama", "tema": e["tema"], "hora": e["hora"], "texto": e.get("texto3d") or "",
-                               "a": min(en(e.get("palabra"), 0.2), round(max(0.0, dur - 2.0), 3)), "semilla": semilla + i}
-                momentos = [d["tres_d"]["a"] + 0.3] + ([d["tres_d"]["a"] + 1.5] if d["tres_d"]["texto"] else [])
-            elif e["tipo"] == "globo":
-                pts = []
-                for k, q in enumerate(e["paradas"]):
-                    lon, lat = _paises()[q["iso"]]["c"]
-                    pts.append({"iso": q["iso"], "lon": lon, "lat": lat, "texto": q["texto"],
-                                "a": min(en(q.get("palabra"), 0.5 + k * 2.0), round(max(0.0, dur - 0.8), 3))})
-                d["tres_d"] = {"script": "globo", "paradas": pts, "semilla": semilla + i}
-                momentos = [q["a"] + 0.45 for q in pts]
-            else:
-                d["tres_d"] = {"script": "objeto", "modelo": e["modelo"], "texto": e["texto3d"], "ambiente": e["ambiente"],
-                               "a": min(en(e.get("palabra"), 0.3), round(max(0.0, dur - 1.0), 3))}
-                momentos = [d["tres_d"]["a"] + 0.28]
-            if e.get("titulo"):
-                d["titulo"] = e["titulo"]
-                d["subtitulos"] = []
-            d["golpe"] = {"texto": e["golpe"]["texto"], "a": en(e["golpe"]["palabra"])} if e.get("golpe") else None
-            previa, pintados = None, set()
-            sonidos.append((a, "whoosh"))
-            sonidos += [(a + m, "golpe" if e["tipo"] == "objeto" or (e["tipo"] == "diorama" and k == 0) else "pop")
-                        for k, m in enumerate(momentos)]
-            if d["golpe"]:
-                sonidos.append((a + d["golpe"]["a"], "golpe"))
-        elif e["tipo"] == "fisicas":
-            d["clip"] = True
-            d["tres_d"] = {"script": "fisicas", "tipo": e["fisica"], "objeto": e["objeto"], "cantidad": e["cantidad"],
-                           "nivel": e["nivel"], "texto": e.get("texto3d") or "", "a": en(e.get("palabra"), 0.4), "semilla": semilla + i}
-            if e.get("titulo"):
-                d["titulo"] = e["titulo"]
-                d["subtitulos"] = []
-            d["golpe"] = {"texto": e["golpe"]["texto"], "a": en(e["golpe"]["palabra"])} if e.get("golpe") else None
-            previa, pintados = None, set()
-            sonidos.append((a, "whoosh"))
-            sonidos.append((a + d["tres_d"]["a"], "golpe" if e["fisica"] == "derrumbe" else "pop"))
             if d["golpe"]:
                 sonidos.append((a + d["golpe"]["a"], "golpe"))
         elif e["tipo"] == "cifra":
@@ -2535,7 +2444,7 @@ def _render_y_montar(fid):
     o = s["opciones"]
     guion = almacen.leer_json(_dir(fid, "guion.json"))
     if o.get("nuevos", True):
-        _versiones(fid, guion)   # con otro aspecto (foto, acuarela...), los dibujos que le falten
+        _versiones(fid, guion)   # con otro aspecto (stickman, grabado...), los dibujos que le falten
     escenas, total = plan(fid)
     motor = _huella_motor()
     pasos = len(escenas) * len(o["formatos"])
@@ -2619,13 +2528,6 @@ def _partes(fid, escenas, formato, estilo, motor, avisar=lambda n, mensaje: None
     partes = []
     o = _leer(fid)["opciones"]
     for n, e in enumerate(escenas):
-        if e["tipo"] in ESCENAS_3D:
-            avisar(n, f"escena {e['i'] + 1} de {len(escenas)}: Blender pinta el plano 3D")
-            clip = blender_gen.plano(e["datos"].get("barro") or e["datos"]["tres_d"], e["duracion"], w, h, _dir(fid, "barro"), o, FPS,
-                                     avisar=lambda m, e=e: avisar(n, f"escena {e['i'] + 1} de {len(escenas)}: Blender, {m}"))
-            parte = renderizar_escena(e, estilo, formato, _dir(fid, "escenas"), motor)
-            partes.append(_con_clip(fid, e, parte, w, h, clip))
-            continue
         if e["datos"].get("vista") == "satelite":
             avisar(n, f"escena {e['i'] + 1}: bajando la foto de satelite")
             e = _con_satelite(fid, e, w, h)
@@ -2699,7 +2601,7 @@ def borrar_clip(fid, i):
 
 
 def _con_clip(fid, escena, parte, w, h, clip=None):
-    """La escena (dibujada sobre verde croma) encima de su clip (el subido o el plano de Blender): el clip llena el
+    """La escena (dibujada sobre verde croma) encima de su clip subido: el clip llena el
     cuadro, se repite si es corto y se corta a la duracion de la escena."""
     clip = clip or _ruta_clip(fid, escena["i"])
     dur = escena["duracion"]
@@ -2737,6 +2639,28 @@ def _con_satelite(fid, escena, w, h):
     return {**escena, "datos": {**d, "satelite": lista}, "archivos": {**(escena.get("archivos") or {}), **archivos}}
 
 
+def _tele(fid, video, w):
+    """Acabado de emision analogica de Retro TV sobre el video ya juntado: halo suave en lo blanco, un pelin de
+    desfase de color siempre y un corte de senal corto (desfase fuerte + destello) en cada cambio de escena. Las
+    lineas, el grano y la vineta ya los pinta el estilo. Si ffmpeg falla, se queda el video sin acabado."""
+    escenas = (almacen.leer_json(_dir(fid, "plan.json"), {}) or {}).get("escenas") or []
+    cortes = [round(e["inicio"], 3) for e in escenas[1:]]
+    k = max(1, round(w / 540))
+    corte = "+".join(f"between(t,{max(0, c - 0.04):.3f},{c + 0.12:.3f})" for c in cortes) or "0"
+    filtro = (f"[0:v]split[a][b];[b]gblur=sigma={6 * k}[halo];[a][halo]blend=all_mode=screen:all_opacity=0.32,"
+              f"rgbashift=rh=-{k}:bh={k},"
+              f"rgbashift=rh=-{6 * k}:bh={6 * k}:rv={2 * k}:enable='{corte}',"
+              f"eq=brightness=0.07:enable='{corte}',format=yuv420p[v]")
+    salida = video[:-4] + "_tele.mp4"
+    r = medios.correr([medios.ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-i", video, "-filter_complex", filtro,
+                       "-map", "[v]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-r", str(FPS), salida], timeout=3600)
+    if r.returncode != 0 or not os.path.isfile(salida):
+        logger.warning(f"fabrica {fid}: sin acabado de tele: {r.stderr[-300:]}")
+        return video
+    os.replace(salida, video)
+    return video
+
+
 def _montar(fid, formato, partes, total, w, h, o):
     carpeta = _dir(fid, "videos", crear=True)
     lista = os.path.join(carpeta, f"lista_{formato.replace(':', 'x')}.txt")
@@ -2749,6 +2673,8 @@ def _montar(fid, formato, partes, total, w, h, o):
                        "-r", str(FPS), combinado], timeout=3600)
     if r.returncode != 0:
         raise RuntimeError(f"no se pudieron juntar las escenas: {r.stderr[-400:]}")
+    if o.get("estilo") == "retrotv":
+        combinado = _tele(fid, combinado, w)
     destino = os.path.join(carpeta, formato.replace(":", "x") + ".mp4")
     musica = o["musica"] if isinstance(o["musica"], str) else ("random" if o["musica"] else "")   # sesiones viejas: bool
     p = {"volumen_voz": 1.0, "musica": musica, "musica_volumen": o.get("musica_volumen", 0.16), "sfx_volumen": 0.5}

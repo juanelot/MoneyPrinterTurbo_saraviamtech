@@ -29,6 +29,8 @@ Ejemplos:
 
   # Saga: el siguiente episodio de un video (Dia 1 -> Dia 2); --idea opcional (si no, lo decide Claude)
   python fabrica_cli.py --siguiente 8f9e617ca583 --idea "se acaba el agua"
+  # Temporada: varios episodios seguidos (Claude planea la tanda; --final = el ultimo cierra la historia)
+  python fabrica_cli.py --siguiente 8f9e617ca583 --episodios 5 --idea "buscan un barco"
 
   # Videos que se paran antes de montar (molde con clips o "revisar"): por defecto el CLI no se para;
   # con --con-pausa se para, imprime REVISION=<id> y sale con codigo 2; despues se sigue con --montar
@@ -38,7 +40,7 @@ Salida: codigo 0 si todos terminan bien, 1 si alguno falla, 2 si alguno quedo es
 empezar (para seguirlo en la web) y la ruta de cada MP4 descargado. Junto a cada video deja un
 .txt con el titulo y la descripcion para publicar.
 
-Variables de entorno (las mismas que estudio_cli.py y zenn_cli.py):
+Variables de entorno (las mismas que estudio_cli.py):
   MPT_API_BASE    URL base de la API v1 (default: https://studio.saraviamtech.com/api/motor)
   MPT_BASIC_AUTH  usuario:password si hay auth basica delante (opcional)
 """
@@ -100,6 +102,9 @@ class Api:
 
     def siguiente(self, fid, idea=""):
         return [self._r("POST", f"/{fid}/siguiente", json={"idea": idea}).json()]
+
+    def temporada(self, fid, cuantos, idea="", final=False):
+        return self._r("POST", f"/{fid}/temporada", json={"cuantos": cuantos, "idea": idea, "final": final}).json()["videos"]
 
     def montar(self, fid, opciones):
         return [self._r("POST", f"/{fid}/montar", json={"opciones": opciones}).json()]
@@ -195,6 +200,9 @@ def main():
     ap.add_argument("--molde", help="nombre o id de un molde: sus opciones en lugar del perfil (las flags mandan)")
     ap.add_argument("--siguiente", help="id de un video: hace su siguiente episodio (saga)")
     ap.add_argument("--idea", default="", help="con --siguiente: que pasa en el episodio (opcional)")
+    ap.add_argument("--episodios", type=int, default=1,
+                    help="con --siguiente: cuantos episodios seguidos (Claude planea la tanda; maximo 10)")
+    ap.add_argument("--final", action="store_true", help="con --episodios: el ultimo cierra la historia")
     ap.add_argument("--montar", help="id de un video parado antes de montar: lo monta (con --musica/--voz si se dan)")
     ap.add_argument("--con-pausa", action="store_true",
                     help="respetar la pausa antes de montar del molde (clips/revisar): sale con REVISION=<id>")
@@ -206,7 +214,7 @@ def main():
     ap.add_argument("--estilo", help="papel, oscuro, documental, periodico, pizarra, cuaderno, minimal, pop, neon, terminal")
     ap.add_argument("--formatos", help="9:16,16:9,1:1 (coma)")
     ap.add_argument("--duracion", type=int, help="segundos aproximados (20-600; mas de 120 = video largo por capitulos)")
-    ap.add_argument("--voz", help="voz de Microsoft (es-ES-AlvaroNeural-Male) o clon:<id>")
+    ap.add_argument("--voz", help="voz de Microsoft (es-ES-AlvaroNeural-Male)")
     ap.add_argument("--velocidad", type=float)
     ap.add_argument("--idioma", help="es, en, pt... (si no, sale de la voz)")
     ap.add_argument("--musica", help='"random", "" (sin musica) o el nombre de una cancion del servidor')
@@ -234,8 +242,12 @@ def main():
         cambios = {k: v for k, v in {"musica": args.musica, "voz": args.voz}.items() if v is not None}
         return terminar(api, args, api.montar(args.montar.strip(), cambios))
     if args.siguiente:
-        videos = api.siguiente(args.siguiente.strip(), args.idea)
-        print(f"FABRICA={videos[0]['id']}  {videos[0]['titulo']}", flush=True)
+        if args.episodios > 1:
+            videos = api.temporada(args.siguiente.strip(), args.episodios, args.idea, args.final)
+        else:
+            videos = api.siguiente(args.siguiente.strip(), args.idea)
+        for v in videos:
+            print(f"FABRICA={v['id']}  {v['titulo']}", flush=True)
         return terminar(api, args, videos)
     temas = [t.strip() for t in args.tema if t.strip()]
     if args.temas_archivo:

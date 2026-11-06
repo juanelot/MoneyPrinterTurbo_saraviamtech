@@ -81,6 +81,13 @@ def conectar():
     return _cli("chrome")
 
 
+def cerrar():
+    """Cierra el Chrome de Flow (no borra la sesion de Google: queda en el perfil)."""
+    if corriendo():
+        raise RuntimeError("Flow esta generando: detén la generacion antes de desconectar")
+    return _cli("cerrar")
+
+
 # ------------------------------------------------------------------ estado
 
 def _ruta_estado(pid):

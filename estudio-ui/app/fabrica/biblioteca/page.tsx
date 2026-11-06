@@ -15,7 +15,7 @@ const NICHOS: Record<string, string> = {
   ciencia: "Ciencia y espacio", animales: "Animales", tecnologia: "Tecnologia", misterios: "Misterios",
 };
 const FAMILIAS: Record<string, string> = {
-  madera: "Madera", plano: "Plano", grabado: "Grabado", foto: "Realista", acuarela: "Acuarela", comic: "Comic", recortes: "Recortes", stickman: "Stickman",
+  madera: "Madera", plano: "Plano", grabado: "Grabado", stickman: "Stickman", retrotv: "Retro TV", thriller: "Thriller",
 };
 const POR_PAGINA = { pegatinas: 35, ilustraciones: 18 };
 

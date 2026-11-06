@@ -1,7 +1,8 @@
 // Escena PORTADA (el gancho): el titulo ya se ve en el primer fotograma (sirve de miniatura) y se asienta despacio.
 // ESCENA = { titulo: "¿Por que *Bolivia* no tiene mar?", antetitulo?: "...",
 //            mapa?: {toma, paises: [{iso, color}]},  (con mapa de fondo y sus paises ya pintados)
-//            protagonista?: src }  (sin mapa: la pegatina de quien va el video, grande junto al titulo)
+//            protagonista?: src,  (sin mapa: la pegatina de quien va el video, grande junto al titulo)
+//            fondo_img?: src }  (Retro TV / Thriller: la primera ilustracion a pantalla completa)
 F.montar(() => {
   const E = F.E;
   if (E.mapa) {
@@ -11,13 +12,27 @@ F.montar(() => {
     for (const p of E.mapa.paises || []) mapa.pais(p.iso, F.color(p.color), 0);
     const velo = F.crear("div", "fx-capa");
     velo.style.background = `linear-gradient(180deg, ${F.v("fondo")}b3 0%, ${F.v("fondo")}40 38%, ${F.v("fondo")}00 62%)`;
+  } else if (E.fondo_img) {
+    // Retro TV / Thriller: la primera imagen del video ya en el primer fotograma, acercandose despacio, y la
+    // mitad izquierda en sombra (--sombra-portada) o un velo oscuro arriba para que el titulo se lea encima
+    const img = F.crear("img", "");
+    img.src = E.fondo_img;
+    F.imagen(E.fondo_img);
+    img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;";
+    F.tl.fromTo(img, { scale: 1.0 }, { scale: 1.08, duration: F.D, ease: "none", transformOrigin: "60% 45%" }, 0);
+    const velo = F.crear("div", "fx-capa");
+    velo.style.background = F.v("sombra-portada") === "si"
+      ? "linear-gradient(90deg, rgba(5,7,10,0.92) 0%, rgba(5,7,10,0.78) 38%, rgba(5,7,10,0.15) 62%, rgba(5,7,10,0) 75%)"
+      : "linear-gradient(180deg, rgba(5,7,10,0.85) 0%, rgba(5,7,10,0.35) 40%, rgba(5,7,10,0) 60%)";
   } else {
     F.fondo();
   }
   // con mapa: en vertical el titulo va arriba; en horizontal, a la izquierda (el mapa ocupa la derecha)
-  const con = E.mapa || E.protagonista;
-  const lado = con && !F.vertical;
-  const ancho = lado ? F.zona.w * 0.48 : F.zona.w;
+  // con imagen de fondo y sombra a la izquierda: el titulo va en la mitad en sombra, alineado a la izquierda
+  const sombraIzq = E.fondo_img && F.v("sombra-portada") === "si";
+  const con = E.mapa || E.protagonista || E.fondo_img;
+  const lado = (con && !F.vertical) || sombraIzq;
+  const ancho = sombraIzq ? F.zona.w * (F.vertical ? 0.62 : 0.5) : lado ? F.zona.w * 0.48 : F.zona.w;
   const caja = F.crear("div", "titulo");
   caja.style.cssText += `position:absolute;left:${F.zona.x}px;width:${ancho}px;text-align:${lado ? "left" : "center"};`;
   if (E.antetitulo) {
@@ -30,7 +45,8 @@ F.montar(() => {
   titulo.innerHTML = F.enPalabras(E.titulo || "");
   const alto = con && F.vertical ? F.zona.h * 0.42 : F.zona.h * 0.8;
   F.ajustar(caja, ancho, alto, F.corto * 0.14);
-  caja.style.top = (con && F.vertical ? F.zona.y : F.zona.y + (F.zona.h - caja.offsetHeight) / 2) + "px";
+  caja.style.top = (sombraIzq ? F.zona.y + (F.zona.h - caja.offsetHeight) * 0.4
+    : con && F.vertical ? F.zona.y : F.zona.y + (F.zona.h - caja.offsetHeight) / 2) + "px";
   if (E.protagonista && !E.mapa) {
     // debajo del titulo (vertical) o a la derecha (horizontal); ya visible en el primer fotograma
     const libre = F.vertical ? { x: F.zona.x, y: F.zona.y + caja.offsetHeight + F.corto * 0.05, w: F.zona.w }

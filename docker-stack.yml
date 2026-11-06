@@ -66,7 +66,7 @@ services:
         - traefik.http.routers.virales.tls.certresolver=letsencryptresolver
         - traefik.http.services.virales.loadbalancer.server.port=3000
         - traefik.http.services.virales.loadbalancer.passHostHeader=1
-        # Auth básica para que nadie más gaste tus créditos (Kie/OpenAI).
+        # Auth básica para que nadie más gaste tus créditos (OpenAI).
         # Generar el hash en el VPS:  htpasswd -nb admin TU_PASSWORD
         # (escapar cada $ como $$ al pegarlo aquí)
         - traefik.http.routers.virales.middlewares=virales-auth

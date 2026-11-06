@@ -18,8 +18,8 @@ from starlette.concurrency import run_in_threadpool
 
 from app.controllers.v1.base import new_router
 from app.services import claude_cli
-from app.services.estudio import (almacen, asistente, creaciones, grafo, maestros, medios, recursos, referencias,
-                                  series, voz_clonada)
+from app.services.estudio import (almacen, creaciones, grafo, maestros, medios, recursos, referencias,
+                                  series)
 from app.services.estudio import miniatura as portada_video
 from app.services.estudio import (biblioteca, clips, editor, escenas_clip, fabrica, flow_gen, graficos, limpieza, publicar,
                                   retoques, virales, clonar, presentadores, banco)
@@ -818,7 +818,7 @@ def fabrica_listar():
 @router.post("/estudio/fabrica", summary="Hacer un video entero desde un tema (guion, voz, escenas y montaje)")
 def fabrica_crear(body: dict = Body(...)):
     """body: {"tema", "nicho"?, "estilo"?, "formatos"?: ["9:16", "16:9", "1:1"], "voz"?: voz de Microsoft,
-    "clon:<id>" o "propia:<archivo>" (de POST /estudio/fabrica/audio; entonces el tema es opcional), "velocidad"?,
+    "propia:<archivo>" (de POST /estudio/fabrica/audio; entonces el tema es opcional), "velocidad"?,
     "duracion"?: s, "musica"?: "random" | "" | cancion, "musica_volumen"?, "subtitulos"?: bool, "idioma"?}.
     Trabaja en segundo plano: consulta GET /estudio/fabrica/{id}."""
     return _clip(fabrica.crear, body)
@@ -864,6 +864,25 @@ def fabrica_montar(fid: str, body: dict = Body(default={})):
 @router.post("/estudio/fabrica/{fid}/siguiente", summary="Siguiente episodio: un video que sigue la historia de este")
 def fabrica_siguiente(fid: str, body: dict = Body(default={})):
     return _clip(fabrica.siguiente_episodio, fid, body.get("idea"))
+
+
+@router.post("/estudio/fabrica/temporada", summary="Temporada: varios episodios de una saga nueva planeados por Claude")
+def fabrica_temporada(body: dict = Body(...)):
+    """body: {"opciones": las de POST /estudio/fabrica (tema = de que va la saga), "cuantos", "idea"?, "final"?}."""
+    return _clip(fabrica.temporada, None, body.get("opciones") or {}, body.get("cuantos") or 3,
+                 body.get("idea"), bool(body.get("final")))
+
+
+@router.post("/estudio/fabrica/saga/{sid}/montar", summary="Montar de una vez los episodios de una saga que esperan en revision")
+def fabrica_montar_saga(sid: str):
+    return _clip(fabrica.montar_saga, sid)
+
+
+@router.post("/estudio/fabrica/{fid}/temporada", summary="Temporada: varios episodios que siguen la historia de este")
+def fabrica_temporada_desde(fid: str, body: dict = Body(default={})):
+    """body: {"cuantos", "idea"?, "final"?, "sin_parar"? (por defecto si: sale todo montado)}."""
+    return _clip(fabrica.temporada, fid, None, body.get("cuantos") or 3, body.get("idea"), bool(body.get("final")),
+                 body.get("sin_parar", True) is not False)
 
 
 @router.post("/estudio/fabrica/{fid}/rehacer", summary="Rehacer desde el guion, la voz o el render (con opciones nuevas)")
@@ -1024,64 +1043,6 @@ def descargar(pid: str):
         raise HTTPException(404, "todavia no hay video")
     slug = re.sub(r"[^a-z0-9]+", "-", proyecto["titulo"].lower()).strip("-")[:60] or "video"
     return FileResponse(ruta, filename=f"{slug}-{pid[:6]}.mp4", media_type="video/mp4")
-
-
-# ------------------------------------------------------------------ asistente
-
-@router.post("/estudio/asistente", summary="Preguntar al asistente (Claude CLI)")
-def asistente_preguntar(body: dict = Body(...)):
-    """body: {"pregunta": str, "charla"?: id, "proyecto"?: id abierto en pantalla}."""
-    pid = body.get("proyecto") or None
-    if pid and not almacen.PATRON_ID.match(pid):
-        pid = None
-    try:
-        return asistente.preguntar(body.get("charla"), body.get("pregunta", ""), pid)
-    except asistente.ErrorAsistente as e:
-        raise HTTPException(400, str(e))
-
-
-@router.get("/estudio/asistente/{cid}", summary="Estado de una charla con el asistente")
-def asistente_ver(cid: str):
-    try:
-        return asistente.ver(cid)
-    except asistente.ErrorAsistente as e:
-        raise HTTPException(404, str(e))
-
-
-# ------------------------------------------------------------------ voz clonada
-
-@router.get("/estudio/voces-clonadas", summary="Voces del servidor de clonacion (si hay uno)")
-def voces_clonadas():
-    if not voz_clonada.url_base():
-        return {"activo": False, "voces": [], "error": None}
-    try:
-        return {"activo": True, "voces": voz_clonada.listar_voces(), "error": None}
-    except Exception as e:  # noqa: BLE001 — el servidor externo puede estar apagado
-        return {"activo": True, "voces": [], "error": f"no responde el servidor de voz clonada ({type(e).__name__})"}
-
-
-@router.post("/estudio/voces-clonadas", summary="Crear una voz a partir de 10-15 s de audio")
-async def voces_clonadas_crear(audio: UploadFile = File(...), nombre: str = Form(...),
-                               transcripcion: str = Form("")):
-    datos = await audio.read()
-    if len(datos) > 60 * 1024 * 1024:
-        raise HTTPException(413, "con 10-15 segundos de voz basta (maximo 60 MB)")
-    try:
-        return voz_clonada.crear_voz(nombre.strip()[:80] or "Mi voz", datos, audio.filename, transcripcion.strip()[:2000])
-    except voz_clonada.NoConfigurado as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"el servidor de voz clonada fallo: {e}")
-
-
-@router.get("/estudio/voces-clonadas/{vid}/audio", summary="Muestra de referencia de una voz")
-def voces_clonadas_audio(vid: str):
-    try:
-        return Response(voz_clonada.audio_voz(vid), media_type="audio/wav")
-    except ValueError:
-        raise HTTPException(400, "voz invalida")
-    except Exception:  # noqa: BLE001
-        raise HTTPException(404, "no se pudo traer la muestra")
 
 
 # ------------------------------------------------------------------ miniatura
@@ -1501,3 +1462,69 @@ def creaciones_borrar(mid: str, cid: str):
     except creaciones.ErrorCreacion as e:
         raise HTTPException(409, str(e))
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ configuracion
+
+from app.services.estudio import ajustes  # noqa: E402
+
+
+@router.get("/estudio/ajustes", summary="Opciones editables + estado de Claude y Flow")
+def ajustes_ver(comprobar_flow: bool = Query(False, description="abrir Flow para ver si hay sesion")):
+    return {"opciones": ajustes.opciones(), "claude": ajustes.claude_estado(),
+            "flow": ajustes.flow_estado(comprobar_flow)}
+
+
+@router.patch("/estudio/ajustes", summary="Cambiar opciones (se guardan en config.toml)")
+def ajustes_guardar(cambios: dict = Body(...)):
+    try:
+        return {"opciones": ajustes.guardar(cambios)}
+    except ajustes.AjusteInvalido as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/estudio/ajustes/claude", summary="Estado de la sesion de Claude")
+def ajustes_claude():
+    return ajustes.claude_estado()
+
+
+@router.post("/estudio/ajustes/claude/conectar", summary="Iniciar sesion en Claude (abre el navegador)")
+def ajustes_claude_conectar():
+    try:
+        return ajustes.claude_conectar()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, str(e))
+
+
+@router.post("/estudio/ajustes/claude/cancelar", summary="Cancelar el inicio de sesion en curso")
+def ajustes_claude_cancelar():
+    return ajustes.claude_cancelar_login()
+
+
+@router.post("/estudio/ajustes/claude/desconectar", summary="Cerrar la sesion de Claude en esta maquina")
+def ajustes_claude_desconectar():
+    try:
+        return ajustes.claude_desconectar()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, str(e))
+
+
+@router.get("/estudio/ajustes/flow", summary="Estado de Flow (comprueba la sesion)")
+def ajustes_flow():
+    return ajustes.flow_estado(True)
+
+
+@router.post("/estudio/ajustes/flow/conectar", summary="Activar Flow y abrir su Chrome para iniciar sesion")
+def ajustes_flow_conectar():
+    try:
+        return ajustes.flow_conectar()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, str(e))
+
+
+@router.post("/estudio/ajustes/flow/desconectar", summary="Cerrar el Chrome de Flow")
+def ajustes_flow_desconectar():
+    try:
+        return ajustes.flow_desconectar()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, str(e))
